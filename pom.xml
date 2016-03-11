@@ -52,6 +52,24 @@
         <sourceDirectory>source</sourceDirectory>
         <testSourceDirectory>test/java</testSourceDirectory>
         <finalName>yacycore</finalName>
+		<resources>
+			<resource>
+				<targetPath>defaults</targetPath>
+				<directory>defaults</directory>
+			</resource>
+			<resource>
+				<targetPath>skins</targetPath>
+				<directory>skins</directory>
+			</resource>
+			<resource>
+				<targetPath>langdetect</targetPath>
+				<directory>langdetect</directory>
+			</resource>
+			<resource>
+				<targetPath>locales</targetPath>
+				<directory>locales</directory>
+			</resource>
+		</resources>
 
         <plugins>
             <!-- included to make htroot visible in IDE (Netbeans) -->
@@ -269,6 +287,144 @@
                 </plugins>
             </build>
         </profile>
+
+	<profile>
+		<!-- profile to create a all-in-one runnable release jar -->
+		<id>release-jar-profile</id>
+		<build>
+			<plugins>
+				<!-- copy htroot before packaging -->
+				<plugin>
+					<artifactId>maven-resources-plugin</artifactId>
+					<version>2.7</version>
+					<executions>
+						<execution>
+							<id>copy-resources</id>
+							<phase>prepare-package</phase>
+							<goals>
+								<goal>copy-resources</goal>
+							</goals>
+							<configuration>
+								<outputDirectory>${project.build.directory}/classes/htroot</outputDirectory>
+								<resources>
+									<resource>
+										<directory>htroot</directory>
+									</resource>
+								</resources>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+
+				<!-- specific jar configuration for all-in-one jar -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-jar-plugin</artifactId>
+					<version>2.6</version>
+					<configuration>
+						<archive>
+							<manifest>
+								<mainClass>net.yacy.yacy</mainClass>
+								<addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+								<addClasspath>false</addClasspath>
+							</manifest>
+							<manifestEntries>
+								<Implementation-Build>${project.version}-${releaseNr}</Implementation-Build>
+								<Permissions>all-permissions</Permissions>
+								<Codebase>*</Codebase>
+								<Application-Name>YaCy</Application-Name>
+								<Entry-Point>net.yacy.yacy</Entry-Point>
+							</manifestEntries>
+						</archive>
+					</configuration>
+				</plugin>
+
+				<!-- Sign jar -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-jarsigner-plugin</artifactId>
+					<version>1.4</version>
+					<executions>
+						<execution>
+							<id>sign</id>
+							<phase>verify</phase>
+							<goals>
+								<goal>sign</goal>
+							</goals>
+						</execution>
+					</executions>
+					<configuration>
+						<!-- <keystore>/path/to/the/keystore</keystore> -->
+						<alias>selfyacy</alias>
+						<archive>yacycore-${project.version}-${releaseNr}</archive>
+<!-- 						<storepass>storepasswd</storepass>
+						<keypass>keypasswd</keypass> -->
+					</configuration>
+				</plugin>
+
+				<!-- Manage included libraries -->
+				<plugin>
+					<groupId>org.apache.maven.plugins</groupId>
+					<artifactId>maven-shade-plugin</artifactId>
+					<version>2.4.3</version>
+					<executions>
+						<execution>
+							<phase>package</phase>
+							<goals>
+								<goal>shade</goal>
+							</goals>
+							<configuration>
+								<!-- Distinguish from main jar yacycore.jar -->
+								<shadedArtifactAttached>true</shadedArtifactAttached>
+								<shadedClassifierName>${releaseNr}</shadedClassifierName>
+								<transformers>
+									<!-- Set main runnable jar class -->
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+										<mainClass>net.yacy.yacy</mainClass>
+									</transformer>
+									<!-- Prevent License Duplication -->
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
+									<!-- Merge SPI services declarations (needed for solr and lucene) -->
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+									<!-- Include all necessary additional resources -->
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+										<resource>META-INF/AUTHORS</resource>
+										<file>AUTHORS</file>
+									</transformer>
+								</transformers>
+								<filters>
+									<filter>
+										<artifact>junit:junit</artifact>
+										<includes>
+											<include>junit/framework/**</include>
+											<include>org/junit/**</include>
+										</includes>
+										<excludes>
+											<exclude>org/junit/experimental/**</exclude>
+											<exclude>org/junit/runners/**</exclude>
+										</excludes>
+									</filter>
+									<filter>
+										<artifact>*:*</artifact>
+										<!-- Exclude embedded jars digests -->
+										<excludes>
+											<exclude>META-INF/*.SF</exclude>
+											<exclude>META-INF/*.DSA</exclude>
+											<exclude>META-INF/*.RSA</exclude>
+										</excludes>
+									</filter>
+								</filters>
+							</configuration>
+						</execution>
+					</executions>
+				</plugin>
+			</plugins>
+		</build>
+	</profile>
                 
         <profile>
             <id>report</id>
