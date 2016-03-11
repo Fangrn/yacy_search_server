@@ -313,7 +313,8 @@ public class Status
         prop.put("usedMemory", Formatter.bytesToString(MemoryControl.used()));
         prop.put("maxMemory", Formatter.bytesToString(MemoryControl.maxMemory()));
         prop.put("usedDisk", Formatter.bytesToString(sb.observer.getSizeOfDataPath(true)));
-        prop.put("freeDisk", Formatter.bytesToString(sb.observer.getUsableSpace()));
+        long usableSpace = sb.observer.getUsableSpace();
+        prop.put("freeDisk", usableSpace < 1L ? "Unknown" : String.valueOf(usableSpace));
         prop.put("processors", WorkflowProcessor.availableCPU);
         prop.put("load", Memory.load());
         ThreadMXBean threadbean = ManagementFactory.getThreadMXBean();

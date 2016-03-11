@@ -35,6 +35,8 @@ import java.util.SortedSet;
 
 import org.apache.solr.common.params.MapSolrParams;
 
+import com.cybozu.labs.langdetect.Language;
+
 import net.yacy.cora.document.WordCache;
 import net.yacy.cora.document.analysis.Classification.ContentDomain;
 import net.yacy.cora.document.analysis.EnhancedTextProfileSignature;
@@ -262,17 +264,10 @@ public final class Condenser extends Tokenizer {
         return this.exact_signature;
     }
     
-    public String language() {
+    public Language language() {
         return this.languageIdentificator.getLanguage();
     }
 
-    /**
-     * get the probability of the detected language received by {@link #language()}
-     * @return 0.0 to 1.0
-     */
-    public double languageProbability() {
-        return this.languageIdentificator.getProbability();
-    }
 
     public static void main(final String[] args) {
         // read a property file and convert them into configuration lines

@@ -26,6 +26,7 @@
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
@@ -35,14 +36,14 @@ import java.util.TreeMap;
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.protocol.HeaderFramework;
 import net.yacy.cora.protocol.RequestHeader;
+import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.data.MessageBoard;
+import net.yacy.kelondro.util.FileUtils;
 import net.yacy.peers.Seed;
 import net.yacy.search.Switchboard;
 import net.yacy.search.SwitchboardConstants;
 import net.yacy.server.serverObjects;
 import net.yacy.server.serverSwitch;
-
-import com.google.common.io.Files;
 
 
 public class Messages_p {
@@ -97,11 +98,13 @@ public class Messages_p {
         MessageBoard.entry message;
 
         // first reset notification
-        final File notifierSource = new File(sb.getAppPath(), sb.getConfig(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT) + "/env/grafics/empty.gif");
-        final File notifierDest = new File(sb.getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT), "notifier.gif");
         try {
-            Files.copy(notifierSource, notifierDest);
+            URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, "/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+            URL notifierSource = new URL(htrootURL, "env/grafics/empty.gif");
+            final File notifierDest = new File(sb.getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT), "notifier.gif");
+            FileUtils.copy(notifierSource, notifierDest);
         } catch (final IOException e) {
+            ConcurrentLog.severe("MESSAGE", "NEW MESSAGE ARRIVED! (error: " + e.getMessage() + ")");
         }
 
         if (action.equals("delete")) {

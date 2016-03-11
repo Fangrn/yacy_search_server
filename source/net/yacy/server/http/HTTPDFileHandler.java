@@ -58,6 +58,11 @@
 package net.yacy.server.http;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+
+import org.eclipse.jetty.util.URIUtil;
+import org.eclipse.jetty.util.resource.Resource;
 
 import net.yacy.cora.document.analysis.Classification;
 import net.yacy.cora.util.ConcurrentLog;
@@ -72,7 +77,7 @@ public final class HTTPDFileHandler {
 
     public  static File     htDocsPath     = null;
     public  static String[] defaultFiles   = null;
-    private static File     htDefaultPath  = null;
+    private static Resource htDefaultResource  = null;
     private static File     htLocalePath   = null;
     public  static String   indexForward   = "";
 
@@ -87,9 +92,11 @@ public final class HTTPDFileHandler {
 
             if (Classification.countMimes() == 0) {
                 // load the mime table
-                final String mimeTablePath = theSwitchboard.getConfig("mimeTable","");
-                ConcurrentLog.config("HTTPDFiles", "Loading mime mapping file " + mimeTablePath);
-                Classification.init(new File(theSwitchboard.getAppPath(), mimeTablePath));
+                URL mimeTable = theSwitchboard.getDataFileOrDefaultResource("mimeTable", SwitchboardConstants.DEFAULTS_RESOURCES_DIR + "httpd.mime");
+                if(mimeTable != null) {
+                    ConcurrentLog.config("HTTPDFiles", "Loading mime mapping file " + mimeTable.toExternalForm());
+                	Classification.init(mimeTable);
+                }
             }
 
             // create default files array
@@ -102,7 +109,17 @@ public final class HTTPDFileHandler {
             }
 
             // create htLocaleDefault, htLocalePath
-            if (htDefaultPath == null) htDefaultPath = theSwitchboard.getAppPath("htDefaultPath", SwitchboardConstants.HTROOT_PATH_DEFAULT);
+			if (htDefaultResource == null) {
+				String htDefaultPath = theSwitchboard.getConfig("htDefaultPath", "");
+				if (htDefaultPath.isEmpty()) {
+					htDefaultResource = Resource.newClassPathResource(URIUtil.SLASH + SwitchboardConstants.HTROOT_PATH_DEFAULT);
+				} else {
+					File htDefaultFile = theSwitchboard.getAppPath("htDefaultPath", "htDefaultPath");
+					if (htDefaultFile.isFile()) {
+						htDefaultResource = Resource.newResource(htDefaultFile);
+					}
+				}
+			}
             if (htLocalePath == null) htLocalePath = theSwitchboard.getDataPath("locale.translated_html", "DATA/LOCALE/htroot");
         }
     }
@@ -115,25 +132,29 @@ public final class HTTPDFileHandler {
         if (indexForward.startsWith("/")) indexForward = indexForward.substring(1);
     }
 
-    /** Returns a path to the localized or default file according to the locale.language (from he switchboard)
+    /** Returns a resource to the localized or default file according to the locale.language (from he switchboard)
      * @param path relative from htroot */
-    public static File getLocalizedFile(final String path){
+    public static Resource getLocalizedFile(final String path){
         String localeSelection = switchboard.getConfig("locale.language","default");
         if (!(localeSelection.equals("default"))) {
             final File localePath = new File(htLocalePath, localeSelection + '/' + path);
-            if (localePath.exists()) return localePath;  // avoid "NoSuchFile" troubles if the "localeSelection" is misspelled
+            if (localePath.exists()) return Resource.newResource(localePath);  // avoid "NoSuchFile" troubles if the "localeSelection" is misspelled
         }
         
         final File docsPath  = new File(htDocsPath, path);
-        if (docsPath.exists()) return docsPath;
-        return new File(htDefaultPath, path);
+        if (docsPath.exists()) return Resource.newResource(docsPath);
+        try {
+			return htDefaultResource.addPath(path);
+		} catch (IOException e) {
+			return null;
+		}
     }
 
-    public static final File getOverlayedFile(final String path) {
-        File targetFile;
+    public static final Resource getOverlayedFile(final String path) {
+    	Resource targetFile;
         targetFile = getLocalizedFile(path);
-        if (!targetFile.exists()) {
-            targetFile = new File(htDocsPath, path);
+        if (targetFile == null || !targetFile.exists()) {
+            targetFile = Resource.newResource(new File(htDocsPath, path));
         }
         return targetFile;
     }

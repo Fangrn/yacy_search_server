@@ -23,6 +23,7 @@ package net.yacy.cora.federate.solr;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.net.URL;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -48,6 +49,10 @@ public class SchemaConfiguration extends Configuration implements Serializable {
 
     public SchemaConfiguration(final File file) throws IOException {
         super(file);
+    }
+    
+    public SchemaConfiguration(final URL schemaURL) throws IOException {
+        super(schemaURL);
     }
 
     public void fill(final SchemaConfiguration other, final boolean defaultActivated) {

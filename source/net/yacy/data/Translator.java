@@ -32,14 +32,16 @@ package net.yacy.data;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,13 +49,15 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.eclipse.jetty.util.URIUtil;
+
 import net.yacy.cora.util.CommonPattern;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.kelondro.util.FileUtils;
 import net.yacy.kelondro.util.Formatter;
+import net.yacy.kelondro.util.ResourceUtils;
 import net.yacy.search.SwitchboardConstants;
 import net.yacy.server.serverSwitch;
-import net.yacy.utils.translation.ExtensionsFileFilter;
 
 /**
  * Wordlist based translator
@@ -106,7 +110,7 @@ public class Translator {
      * @param translationFile the File, which contains the Lists
      * @return a HashMap, which contains for each File a HashMap with translations.
      */
-    public static Map<String, Map<String, String>> loadTranslationsLists(final File translationFile) {
+    public static Map<String, Map<String, String>> loadTranslationsLists(final URL translationFile) {
         final Map<String, Map<String, String>> lists = new HashMap<String, Map<String, String>>(); //list of translationLists for different files.
         Map<String, String> translationList = new LinkedHashMap<String, String>(); //current Translation Table (maintaining input order)
 
@@ -138,9 +142,9 @@ public class Translator {
         return lists;
     }
 
-    public static boolean translateFile(final File sourceFile, final File destFile, final File translationFile){
-        return translateFile(sourceFile, destFile, loadTranslationsLists(translationFile).get(sourceFile.getName()));
-    }
+//    public static boolean translateFile(final URL sourceFile, final File destFile, final URL translationFile){
+//        return translateFile(sourceFile, destFile, loadTranslationsLists(translationFile).get(sourceFile.getName()));
+//    }
 
     /**
      * Translate sourceFile to destFile using translationList.
@@ -149,26 +153,30 @@ public class Translator {
      * @param translationList map of translations
      * @return true when destFile was sucessfully written, false otherwise
      */
-    public static boolean translateFile(final File sourceFile, final File destFile, final Map<String, String> translationList){
+    public static boolean translateFile(final URL sourceFile, final File destFile, final Map<String, String> translationList){
 
-        StringBuilder content = new StringBuilder();
-        BufferedReader br = null;
-        try{
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(sourceFile), StandardCharsets.UTF_8));
-            String line = null;
-            while( (line = br.readLine()) != null){
-                content.append(line).append(net.yacy.server.serverCore.CRLF_STRING);
-            }
-            br.close();
-        } catch(final IOException e) {
-            return false;
-        } finally {
-            if (br !=null) {
-                try {
-                    br.close();
-                } catch (final Exception e) {}
-            }
-        }
+		StringBuilder content = new StringBuilder();
+		BufferedReader br = null;
+		try {
+			InputStream inStream = sourceFile.openStream();
+			if (inStream == null) {
+				return false;
+			}
+			br = new BufferedReader(new InputStreamReader(inStream, StandardCharsets.UTF_8));
+			String line = null;
+			while ((line = br.readLine()) != null) {
+				content.append(line).append(net.yacy.server.serverCore.CRLF_STRING);
+			}
+		} catch (final IOException e) {
+			return false;
+		} finally {
+			if (br != null) {
+				try {
+					br.close();
+				} catch (final Exception e) {
+				}
+			}
+		}
 
         String processedContent = translate(content.toString(), translationList);
         BufferedWriter bw = null;
@@ -189,31 +197,45 @@ public class Translator {
 	return true;
     }
 
-    public static boolean translateFiles(final File sourceDir, final File destDir, final File baseDir, final File translationFile, final String extensions){
+    public static boolean translateFiles(final URL sourceDir, final File destDir, final URL baseDir, final URL translationFile, final String extensions){
         return translateFiles(sourceDir, destDir, baseDir, loadTranslationsLists(translationFile), extensions);
     }
 
-    public static boolean translateFiles(final File sourceDir, final File destDir, final File baseDir, final Map<String, Map<String, String>> translationLists, final String extensions){
+    public static boolean translateFiles(final URL sourceDir, final File destDir, final URL baseDir, final Map<String, Map<String, String>> translationLists, final String extensions){
         destDir.mkdirs();
         final List<String> exts = ListManager.string2vector(extensions);
-        final File[] sourceFiles = sourceDir.listFiles(new ExtensionsFileFilter(exts));
+        List<URL> sourceFiles = ResourceUtils.listFileResources(sourceDir);
         String relativePath;
-        for (final File sourceFile : sourceFiles) {
+        int baseDirURLLength = baseDir.toExternalForm().length();
+        for (final URL sourceFile : sourceFiles) {
+        	String sourceURLString = sourceFile.toExternalForm();
+        	boolean extOK = false;
+        	for(String ext : exts) {
+        		if(sourceURLString.endsWith(ext)) {
+        			extOK = true;
+        			break;
+        		}
+        	}
+        	if(!extOK) {
+        		continue;
+        	}
             try {
-                relativePath=sourceFile.getAbsolutePath().substring(baseDir.getAbsolutePath().length()+1); //+1 to get the "/"
-                relativePath = relativePath.replace(File.separatorChar, '/');
+                relativePath = sourceFile.toExternalForm().substring(baseDirURLLength);
+                if(relativePath.startsWith("/")) {
+                	relativePath = relativePath.substring(1);
+                }
             } catch (final IndexOutOfBoundsException e) {
-                 ConcurrentLog.severe("TRANSLATOR", "Error creating relative Path for "+sourceFile.getAbsolutePath());
-                relativePath = "wrong path"; //not in translationLists
+                 ConcurrentLog.severe("TRANSLATOR", "Error creating relative Path for " + sourceFile.toExternalForm());
+                 relativePath = "wrong path"; //not in translationLists
             }
             if (translationLists.containsKey(relativePath)) {
                 ConcurrentLog.info("TRANSLATOR", "Translating file: "+ relativePath);
                 if(!translateFile(
                                   sourceFile,
-                                  new File(destDir, sourceFile.getName().replace('/', File.separatorChar)),
+                                  new File(destDir, ResourceUtils.getFileName(sourceFile)),
                                   translationLists.get(relativePath)))
                 {
-                    ConcurrentLog.severe("TRANSLATOR", "File error while translating file "+relativePath);
+                    ConcurrentLog.severe("TRANSLATOR", "File error while translating file " + relativePath);
                 }
                 //}else{
                     //serverLog.logInfo("TRANSLATOR", "No translation for file: "+relativePath);
@@ -222,16 +244,16 @@ public class Translator {
         return true;
     }
 
-    public static boolean translateFilesRecursive(final File sourceDir, final File destDir, final File translationFile, final String extensions, final String notdir){
-        final List<File> dirList=FileUtils.getDirsRecursive(sourceDir, notdir);
+    public static boolean translateFilesRecursive(final URL sourceDir, final File destDir, final URL translationFile, final String extensions, final String notdir){
+    	final List<URL> dirList = ResourceUtils.listRecursiveDirectories(sourceDir, notdir);
         dirList.add(sourceDir);
-        for (final File file : dirList) {
-            if(file.isDirectory() && !file.getName().equals(notdir)) {
-                //cuts the sourcePath and prepends the destPath
-                File file2 = new File(destDir, file.getPath().substring(sourceDir.getPath().length()));
-                translateFiles(file, file2, sourceDir, translationFile, extensions);
-            }
-        }
+        int sourceDirURLLength = sourceDir.toExternalForm().length();
+		for (final URL childSourceDir : dirList) {
+			// cuts the sourcePath and prepends the destPath
+			String childDestPath = childSourceDir.toExternalForm().substring(sourceDirURLLength);
+			File childDestDir = new File(destDir, childDestPath);
+			translateFiles(childSourceDir, childDestDir, sourceDir, translationFile, extensions);
+		}
         return true;
     }
 
@@ -251,39 +273,63 @@ public class Translator {
         return map;
     }
 
-    public static boolean changeLang(final serverSwitch env, final File langPath, final String lang) {
+    /**
+     * Change interface language to specified lang code
+     * @param env server environnment. Must not be null.
+     * @param translationFile translation file url. May be null when lang is "default"
+     * @param lang target lang code (2 characters)
+     * @return true when language was changed and no error occured
+     */
+    public static boolean changeLang(final serverSwitch env, final URL translationFile, final String lang) {
         boolean ret = false;
 
-        if ("default".equals(lang) || "default.lng".equals(lang)) {
+        if ("default".equals(lang)) {
             env.setConfig("locale.language", "default");
             ret = true;
         } else {
-            final String htRootPath = env.getConfig(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT);
-            final File sourceDir = new File(env.getAppPath(), htRootPath);
-            final File destDir = new File(env.getDataPath("locale.translated_html", "DATA/LOCALE/htroot"), lang.substring(0, lang.length() - 4));// cut
-            // .lng
-            //File destDir = new File(env.getRootPath(), htRootPath + "/locale/" + lang.substring(0, lang.length() - 4));// cut
-            // .lng
-            final File translationFile = new File(langPath, lang);
-
-            //if (translator.translateFiles(sourceDir, destDir, translationFile, "html")) {
-            if (Translator.translateFilesRecursive(sourceDir, destDir, translationFile, "html,template,inc", "locale")) {
-                env.setConfig("locale.language", lang.substring(0, lang.length() - 4));
-                Formatter.setLocale(env.getConfig("locale.language", "en"));
-                try {
-                    final BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(new File(destDir, "version"))));
-                    bw.write(env.getConfig("svnRevision", "Error getting Version"));
-                    bw.close();
-                } catch (final IOException e) {
-                    // Error
-                }
-                ret = true;
-            }
+            URL htrootURL = env.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, URIUtil.SLASH + SwitchboardConstants.HTROOT_PATH_DEFAULT);
+            final File destDir = new File(env.getDataPath("locale.translated_html", "DATA/LOCALE/htroot"), lang);// cut
+            
+			if(htrootURL != null) {
+				if (Translator.translateFilesRecursive(htrootURL, destDir, translationFile, "html,template,inc", "locale")) {
+					env.setConfig("locale.language", lang);
+					Formatter.setLocale(env.getConfig("locale.language", "en"));
+					BufferedWriter bw = null;
+					try {
+						bw = new BufferedWriter(new PrintWriter(new FileWriter(new File(destDir, "version"))));
+						bw.write(env.getConfig("svnRevision", "Error getting Version"));
+						bw.close();
+					} catch (final IOException e) {
+						ConcurrentLog.warn("TRANSLATOR", "Could write svnRevision");
+					} finally {
+						if(bw != null) {
+							try {
+								bw.close();
+							} catch (IOException ignored) {
+							}
+						}
+					}
+					ret = true;
+				}
+			}
         }
         return ret;
     }
 
-    public static List<String> langFiles(File langPath) {
-        return FileUtils.getDirListing(langPath, Translator.LANG_FILENAME_FILTER);
+    /**
+     * List language files under langPath classpath directory
+     * @param langPath languages classpath directory 
+     * @return a list of language files URLs eventually empty
+     */
+    public static List<URL> langFiles(URL langPath) {
+    	List<URL> resources = ResourceUtils.listFileResources(langPath);
+    	List<URL> langFiles = new ArrayList<>();
+    	for(URL resource : resources) {
+    		String fileName = ResourceUtils.getFileName(resource);
+            if (fileName.matches(Translator.LANG_FILENAME_FILTER) ) {
+            	langFiles.add(resource);
+            }
+    	}
+        return langFiles;
     }
 }

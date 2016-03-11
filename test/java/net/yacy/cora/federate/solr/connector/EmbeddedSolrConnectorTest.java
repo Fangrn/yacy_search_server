@@ -30,10 +30,10 @@ public class EmbeddedSolrConnectorTest {
      */
     @BeforeClass
     public static void initTesting() {
-        File solr_config = new File("defaults/solr");
+        String solr_config = "/defaults/solr/";
         File storage = new File("test/DATA/INDEX/webportal/SEGMENTS/text/solr/");
         storage.mkdirs();
-        System.out.println("setup EmeddedSolrConnector using config dir: " + solr_config.getAbsolutePath());
+        System.out.println("setup EmeddedSolrConnector using config classpath dir: " + solr_config);
         try {
             EmbeddedInstance localCollectionInstance = new EmbeddedInstance(solr_config, storage, CollectionSchema.CORE_NAME, new String[]{CollectionSchema.CORE_NAME, WebgraphSchema.CORE_NAME});
             solr = new EmbeddedSolrConnector(localCollectionInstance);

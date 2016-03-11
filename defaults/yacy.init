@@ -61,7 +61,7 @@ bindPort =
 #    If the property keyStore is not specified, then a new keystore file 
 #    DATA/SETTINGS/myPeerKeystore will be created.
 
-keyStore=defaults/freeworldKeystore
+keyStore=/defaults/freeworldKeystore
 keyStorePassword=freeworld
 pkcs12ImportFile = 
 pkcs12ImportPwd = 
@@ -102,9 +102,9 @@ filesize.max.other = 8589934591
 # The property here can also be a url where the definition can be loaded.
 # In case of privately managed networks, this configuration must be changed BEFORE it is released
 # to the members of the separated network peers.
-network.unit.definition = defaults/yacy.network.freeworld.unit
-#network.unit.definition = defaults/yacy.network.webportal.unit
-#network.unit.definition = defaults/yacy.network.intranet.unit
+network.unit.definition = /defaults/yacy.network.freeworld.unit
+#network.unit.definition = /defaults/yacy.network.webportal.unit
+#network.unit.definition = /defaults/yacy.network.intranet.unit
 
 # distinguish intranet/internet IPs:
 # if this setting is set to true, then only URL-Hashes with 'intranet'-Flag is created, even if the
@@ -196,11 +196,13 @@ httpdMaxBusySessions = 200
 # may be overridden by the htdocs parameter
 # users shall be encouraged to use the htdocs path for individual content,
 # not this path defined here
-htRootPath = htroot
+# if not set here, /htroot classpath dir is used instead
+# htRootPath = htroot
 
 # the htroot path
 # root path for the httpd file server
-htDefaultPath=htroot
+# if not set here, /htroot classpath dir is used instead
+# htDefaultPath=htroot
 
 # individual htroot folder
 # every user may publicize her/his own web pages
@@ -232,10 +234,12 @@ locale.language=default
 fileHost = localpeer
 
 # specify the path to the MIME matching file table
-mimeTable = defaults/httpd.mime
+# if not specified, YaCy will use /defaults/httpd.mime classpath resource
+# mimeTable = DATA/SETTINGS/httpd.mime
 
 # specify the path to the sessionid name file
-sessionidNamesFile = defaults/sessionid.names
+# if not specified, YaCy will use /defaults/sessionid.names classpath resource
+# sessionidNamesFile = DATA/SETTINGS/sessionid.names
 
 # a path to the file cache, used for the internal proxy and as crawl buffer
 # This will be used if the server is addressed as a proxy
@@ -326,6 +330,7 @@ dht.BlackLists=url.default.black
 search.BlackLists=url.default.black
 surftips.BlackLists=url.default.black
 news.BlackLists=url.default.black
+
 
 # the blue-list; 
 # no search result is locally presented that has any word of the bluelist
@@ -418,7 +423,7 @@ adminAccountAllPages=false
 #   (RFC 2617 standard and recommendation). If you want to share password configuration 
 #   with additional machines they have to belong to the same realm
 # - authentication defaults to BASIC 
-# - and can be configured in defaults/web.xml , tag <auth-method>
+# - and can be configured in /defaults/web.xml , tag <auth-method>
 #adminRealm=YaCy-AdminUI
 adminRealm=The YaCy access is limited to administrators. If you don't know the password, you can change it using <yacy-home>/bin/passwd.sh <new-password>
 
@@ -682,7 +687,7 @@ reindexSolr_loadprereq=9.0
 # additional attributes:
 # performanceIO is a percent-value. a value of 10 means, that 10% of the busysleep time
 # is used to flush the RAM cache, which is the major part of the IO in YaCy
-performanceProfile=defaults/yacy.init
+performanceProfile=/defaults/yacy.init
 performanceSpeed=100
 performanceIO=10
 

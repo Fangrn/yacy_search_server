@@ -35,17 +35,27 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
+
+import org.eclipse.jetty.util.URIUtil;
+
 import net.yacy.cora.date.GenericFormatter;
+import net.yacy.cora.document.id.DigestURL;
+import net.yacy.cora.federate.yacy.CacheStrategy;
+import net.yacy.cora.order.Digest;
 import net.yacy.cora.protocol.ClientIdentification;
+import net.yacy.cora.protocol.ConnectionInfo;
 import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.cora.protocol.TimeoutRequest;
 import net.yacy.cora.protocol.http.HTTPClient;
 import net.yacy.cora.sorting.Array;
 import net.yacy.cora.util.ConcurrentLog;
+import net.yacy.crawler.retrieval.Response;
 import net.yacy.data.Translator;
 import net.yacy.gui.YaCyApp;
 import net.yacy.gui.framework.Browser;
@@ -59,12 +69,6 @@ import net.yacy.peers.operation.yacyBuildProperties;
 import net.yacy.peers.operation.yacyRelease;
 import net.yacy.search.Switchboard;
 import net.yacy.search.SwitchboardConstants;
-import com.google.common.io.Files;
-import net.yacy.cora.document.id.DigestURL;
-import net.yacy.cora.federate.yacy.CacheStrategy;
-import net.yacy.cora.order.Digest;
-import net.yacy.cora.protocol.ConnectionInfo;
-import net.yacy.crawler.retrieval.Response;
 import net.yacy.server.serverSwitch;
 
 
@@ -168,21 +172,8 @@ public final class yacy {
 			}
 
             // setting up logging
-			f = new File(dataHome, "DATA/LOG/");
-            mkdirsIfNeseccary(f);
-			f = new File(dataHome, "DATA/LOG/yacy.logging");
-			final File f0 = new File(appHome, "defaults/yacy.logging");
-			if (!f.exists() || f0.lastModified() > f.lastModified()) try {
-			    Files.copy(f0, f);
-            } catch (final IOException e){
-                System.out.println("could not copy yacy.logging");
-            }
-            try{
-                ConcurrentLog.configureLogging(dataHome, appHome, new File(dataHome, "DATA/LOG/yacy.logging"));
-            } catch (final IOException e) {
-                System.out.println("could not find logging properties in homePath=" + dataHome);
-                ConcurrentLog.logException(e);
-            }
+			configureLog(dataHome, appHome);
+			
             ConcurrentLog.config("STARTUP", "YaCy version: " + yacyBuildProperties.getVersion() + "/" + yacyBuildProperties.getSVNRevision());
             ConcurrentLog.config("STARTUP", "Java version: " + System.getProperty("java.version", "no-java-version"));
             ConcurrentLog.config("STARTUP", "Operation system: " + System.getProperty("os.name","unknown"));
@@ -210,7 +201,7 @@ public final class yacy {
             } catch (IOException ex) { }
 
             try {
-                sb = new Switchboard(dataHome, appHome, "defaults/yacy.init".replace("/", File.separator), conf);
+                sb = new Switchboard(dataHome, appHome, yacy.class.getResource("/defaults/yacy.init"), conf);
             } catch (final RuntimeException e) {
                 ConcurrentLog.severe("STARTUP", "YaCy cannot start: " + e.getMessage(), e);
                 System.exit(-1);
@@ -268,7 +259,14 @@ public final class yacy {
             
             // create default notifier picture
             File notifierFile = new File(htDocsPath, "notifier.gif");
-            if (!notifierFile.exists()) try {Files.copy(new File(htRootPath, "env/grafics/empty.gif"), notifierFile);} catch (final IOException e) {}
+			if (!notifierFile.exists()) {
+				try {
+					final URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
+							URIUtil.SLASH + SwitchboardConstants.HTROOT_PATH_DEFAULT);
+					FileUtils.copy(new URL(htrootURL, "env/grafics/empty.gif"), notifierFile);
+				} catch (final IOException e) {
+				}
+			}
 
             final File htdocsReadme = new File(htDocsPath, "readme.txt");
             if (!(htdocsReadme.exists())) try {FileUtils.copy((
@@ -329,7 +327,7 @@ public final class yacy {
                 sb.tray.setReady();
 
                 //regenerate Locales from Translationlist, if needed
-                final File locale_source = sb.getAppPath("locale.source", "locales");
+                final URL locale_source = sb.getAppFileOrDefaultResource("locale.source", "/locales/");
                 final String lang = sb.getConfig("locale.language", "");
                 if (!lang.equals("") && !lang.equals("default")) { //locale is used
                     String currentRev = "";
@@ -344,7 +342,11 @@ public final class yacy {
                     if (!currentRev.equals(sb.getConfig("svnRevision", ""))) try { //is this another version?!
                         final File sourceDir = new File(sb.getConfig(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT));
                         final File destDir = new File(sb.getDataPath("locale.translated_html", "DATA/LOCALE/htroot"), lang);
-                        if (Translator.translateFilesRecursive(sourceDir, destDir, new File(locale_source, lang + ".lng"), "html,template,inc", "locale")){ //translate it
+                        URL translationFileURL = null;
+                        if(locale_source != null) {
+                        	translationFileURL = new URL(locale_source, lang + ".lng");
+                        }
+                        if (Translator.translateFilesRecursive(sourceDir.getAbsoluteFile().toURI().toURL(), destDir, translationFileURL, "html,template,inc", "locale")){ //translate it
                             //write the new Versionnumber
                             final BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(new File(destDir, "version"))));
                             bw.write(sb.getConfig("svnRevision", "Error getting Version"));
@@ -404,6 +406,44 @@ public final class yacy {
     }
 
 	/**
+	 * Set up logging
+	 * @param dataHome DATA parent directory. Must not be null.
+	 * @param appHome application parent directory. Must not be null.
+	 */
+	private static void configureLog(final File dataHome, final File appHome) {
+		File logDir = new File(dataHome, "DATA/LOG/");
+		if (mkdirsIfNeseccary(logDir)) {
+			File logConf = new File(logDir, "yacy.logging");
+			URL defaultConfURL = yacy.class.getResource("/defaults/yacy.logging");
+			if (defaultConfURL != null) {
+				URLConnection defaultConfConn = null;
+				try {
+					defaultConfConn = defaultConfURL.openConnection();
+				} catch (final IOException e) {
+					System.err.println("could not open default logging configuration");
+					ConcurrentLog.logException(e);
+				}
+
+				if (defaultConfConn != null
+						&& (!logConf.exists() || defaultConfConn.getLastModified() > logConf.lastModified())) {
+					try {
+						FileUtils.copy(defaultConfConn.getInputStream(), logConf);
+					} catch (final IOException e) {
+						System.err.println("could not copy yacy.logging");
+						ConcurrentLog.logException(e);
+					}
+				}
+			}
+			try {
+				ConcurrentLog.configureLogging(dataHome, appHome, logConf);
+			} catch (final IOException e) {
+				System.err.println("could not find logging properties in homePath=" + dataHome);
+				ConcurrentLog.logException(e);
+			}
+		}
+	}
+
+	/**
 	 * @param f
 	 */
 	private static void delete(final File f) {
@@ -423,12 +463,21 @@ public final class yacy {
 
 	/**
 	 * @see File#mkdirs()
-	 * @param path
+	 * @param path directory pathname
+	 * @return true when directory existed or has been successfully created.
 	 */
-	public static void mkdirsIfNeseccary(final File path) {
-		if (!(path.exists()))
-			if(!path.mkdirs())
+	public static boolean mkdirsIfNeseccary(final File path) {
+		boolean success = false;
+		if (!(path.exists())) {
+			if(!path.mkdirs()) {
 				ConcurrentLog.warn("STARTUP", "could not create directories "+ path.toString());
+			} else {
+				success = true;
+			}
+		} else {
+			success = true;
+		}
+		return success;
 	}
 
 	/**
@@ -668,7 +717,7 @@ public final class yacy {
                         }
                     }
                     // use serverSwitch to read config properties (including init values from yacy.init
-                    serverSwitch ss = new serverSwitch(dataRoot,applicationRoot,"defaults/yacy.init","DATA/SETTINGS/yacy.conf");
+                    serverSwitch ss = new serverSwitch(dataRoot,applicationRoot, yacy.class.getResource("/defaults/yacy.init") ,"DATA/SETTINGS/yacy.conf");
 
                     for (int icnt=1; icnt < args.length ; icnt++) {
                         String cfg = args[icnt];

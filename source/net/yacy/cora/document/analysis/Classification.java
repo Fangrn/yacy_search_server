@@ -21,8 +21,9 @@
 package net.yacy.cora.document.analysis;
 
 import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -187,17 +188,25 @@ public class Classification {
 
     private static final Properties mimeTable = new Properties();
 
-    public static void init(final File mimeFile) {
+    public static void init(final URL mimeFile) {
         if (mimeTable.isEmpty()) {
-            // load the mime table
-            BufferedInputStream mimeTableInputStream = null;
-            try {
-                mimeTableInputStream = new BufferedInputStream(new FileInputStream(mimeFile));
-                mimeTable.load(mimeTableInputStream);
-            } catch (final Exception e) {
-            } finally {
-                if (mimeTableInputStream != null) try { mimeTableInputStream.close(); } catch (final Exception e1) {}
-            }
+			if (mimeFile != null) {
+				// load the mime table
+				BufferedInputStream mimeTableInputStream = null;
+				try {
+					InputStream mimeStream = mimeFile.openStream();
+					if(mimeStream != null) {
+						mimeTableInputStream = new BufferedInputStream(mimeStream);
+						mimeTable.load(mimeTableInputStream);
+					}
+				} catch (final Exception ignored) {
+				} finally {
+					try {
+						mimeTableInputStream.close();
+					} catch (IOException ignored) {
+					}
+				}
+			}
         }
         for (Entry<Object, Object> entry: mimeTable.entrySet()) {
             String ext = (String) entry.getKey();

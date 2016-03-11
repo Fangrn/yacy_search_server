@@ -45,11 +45,16 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
@@ -85,6 +90,7 @@ import java.util.zip.ZipInputStream;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 
+import net.yacy.yacy;
 import net.yacy.contentcontrol.ContentControlFilterUpdateThread;
 import net.yacy.contentcontrol.SMWListSyncThread;
 import net.yacy.cora.date.GenericFormatter;
@@ -129,9 +135,9 @@ import net.yacy.crawler.data.Cache;
 import net.yacy.crawler.data.CrawlProfile;
 import net.yacy.crawler.data.CrawlQueues;
 import net.yacy.crawler.data.NoticedURL;
+import net.yacy.crawler.data.NoticedURL.StackType;
 import net.yacy.crawler.data.ResultImages;
 import net.yacy.crawler.data.ResultURLs;
-import net.yacy.crawler.data.NoticedURL.StackType;
 import net.yacy.crawler.data.ResultURLs.EventOrigin;
 import net.yacy.crawler.data.Transactions;
 import net.yacy.crawler.retrieval.Request;
@@ -153,11 +159,11 @@ import net.yacy.document.Condenser;
 import net.yacy.document.Document;
 import net.yacy.document.LibraryProvider;
 import net.yacy.document.Parser;
+import net.yacy.document.Parser.Failure;
 import net.yacy.document.ProbabilisticClassifier;
 import net.yacy.document.TextParser;
-import net.yacy.document.VocabularyScraper;
-import net.yacy.document.Parser.Failure;
 import net.yacy.document.Tokenizer;
+import net.yacy.document.VocabularyScraper;
 import net.yacy.document.content.DCEntry;
 import net.yacy.document.content.SurrogateReader;
 import net.yacy.document.importer.OAIListFriendsLoader;
@@ -176,16 +182,17 @@ import net.yacy.kelondro.rwi.ReferenceContainer;
 import net.yacy.kelondro.util.FileUtils;
 import net.yacy.kelondro.util.MemoryControl;
 import net.yacy.kelondro.util.OS;
+import net.yacy.kelondro.util.ResourceUtils;
 import net.yacy.kelondro.util.SetTools;
 import net.yacy.kelondro.workflow.BusyThread;
 import net.yacy.kelondro.workflow.InstantBusyThread;
 import net.yacy.kelondro.workflow.WorkflowProcessor;
 import net.yacy.kelondro.workflow.WorkflowThread;
+import net.yacy.peers.DHTSelection;
 import net.yacy.peers.Dispatcher;
 import net.yacy.peers.EventChannel;
 import net.yacy.peers.Network;
 import net.yacy.peers.NewsPool;
-import net.yacy.peers.DHTSelection;
 import net.yacy.peers.Protocol;
 import net.yacy.peers.Seed;
 import net.yacy.peers.SeedDB;
@@ -214,8 +221,6 @@ import net.yacy.utils.CryptoLib;
 import net.yacy.utils.crypt;
 import net.yacy.utils.upnp.UPnP;
 import net.yacy.visualization.CircleTool;
-
-import com.google.common.io.Files;
 
 
 
@@ -301,8 +306,8 @@ public final class Switchboard extends serverSwitch {
     private static Switchboard sb;
     public HashMap<String, Object[]> crawlJobsStatus = new HashMap<String, Object[]>();
 
-    public Switchboard(final File dataPath, final File appPath, final String initPath, final String configPath) {
-        super(dataPath, appPath, initPath, configPath);
+    public Switchboard(final File dataPath, final File appPath, final URL initURL, final String configPath) {
+        super(dataPath, appPath, initURL, configPath);
         sb = this;
         // check if port is already occupied
         final int port = getLocalPort();
@@ -358,24 +363,8 @@ public final class Switchboard extends serverSwitch {
         this.htDocsPath =
             getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT);
         this.log.config("HTDOCS Path:    " + this.htDocsPath.toString());
-        this.workPath = getDataPath(SwitchboardConstants.WORK_PATH, SwitchboardConstants.WORK_PATH_DEFAULT);
-        this.workPath.mkdirs();
-        // if default work files exist, copy them (don't overwrite existing!)
-        File defaultWorkPath = new File(appPath, "defaults/data/work");
-        if (defaultWorkPath.list() != null) {
-            for (String fs : defaultWorkPath.list()) {
-                File wf = new File(this.workPath, fs);
-                if (!wf.exists()) {
-                    try {
-                        Files.copy(new File(defaultWorkPath, fs), wf);
-                    } catch (final IOException e) {
-                        ConcurrentLog.logException(e);
-                    }
-                }
-            }
-        }
         
-        this.log.config("Work Path:    " + this.workPath.toString());
+        loadWorkPath();
 
         this.dictionariesPath =
             getDataPath(
@@ -418,9 +407,20 @@ public final class Switchboard extends serverSwitch {
         Domains.init(new File(this.workPath, "globalhosts.list"));
 
         // init sessionid name file
-        final String sessionidNamesFile = getConfig("sessionidNamesFile", "defaults/sessionid.names");
-        this.log.config("Loading sessionid file " + sessionidNamesFile);
-        MultiProtocolURL.initSessionIDNames(FileUtils.loadList(new File(getAppPath(), sessionidNamesFile)));
+      
+        URL sessionIdNames = getDataFileOrDefaultResource("sessionidNamesFile", SwitchboardConstants.DEFAULTS_RESOURCES_DIR + "sessionid.names");
+        if(sessionIdNames != null) {
+        	this.log.config("Loading sessionid file " + sessionIdNames.toExternalForm());
+            try {
+            	InputStream sessionIdStream = sessionIdNames.openStream();
+            	if(sessionIdStream != null) {
+            		MultiProtocolURL.initSessionIDNames(FileUtils.loadList(new InputStreamReader(sessionIdStream, StandardCharsets.UTF_8)));
+            	}
+			} catch (IOException e) {
+				this.log.severe("Error loading sessionid file", e);
+			}
+        }
+        
 
         // init tables
         this.tables = new WorkTables(this.workPath);
@@ -456,9 +456,9 @@ public final class Switchboard extends serverSwitch {
         this.queuesRoot.mkdirs();
 
         // prepare a solr index profile switch list
-        final File solrCollectionConfigurationInitFile = new File(getAppPath(),  "defaults/" + SOLR_COLLECTION_CONFIGURATION_NAME);
+        final URL solrCollectionConfigurationInitURL = yacy.class.getResource(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + SOLR_COLLECTION_CONFIGURATION_NAME);
         final File solrCollectionConfigurationWorkFile = new File(getDataPath(), "DATA/SETTINGS/" + SOLR_COLLECTION_CONFIGURATION_NAME);
-        final File solrWebgraphConfigurationInitFile   = new File(getAppPath(),  "defaults/" + SOLR_WEBGRAPH_CONFIGURATION_NAME);
+        final URL solrWebgraphConfigurationInitURL   = yacy.class.getResource(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + SOLR_WEBGRAPH_CONFIGURATION_NAME);
         final File solrWebgraphConfigurationWorkFile   = new File(getDataPath(), "DATA/SETTINGS/" + SOLR_WEBGRAPH_CONFIGURATION_NAME);
         CollectionConfiguration solrCollectionConfigurationWork = null;
         WebgraphConfiguration solrWebgraphConfigurationWork = null;
@@ -469,7 +469,8 @@ public final class Switchboard extends serverSwitch {
 
         // initialize the collection schema if it does not yet exist
         if (!solrCollectionConfigurationWorkFile.exists()) try {
-            Files.copy(solrCollectionConfigurationInitFile, solrCollectionConfigurationWorkFile);
+        	InputStream initConfigStream = solrCollectionConfigurationInitURL.openStream();
+        	FileUtils.copy(initConfigStream, solrCollectionConfigurationWorkFile);
         } catch (final IOException e) {ConcurrentLog.logException(e);}
 
         // lazy definition of schema: do not write empty fields
@@ -477,7 +478,7 @@ public final class Switchboard extends serverSwitch {
 
         // define collection schema
         try {
-            final CollectionConfiguration solrCollectionConfigurationInit = new CollectionConfiguration(solrCollectionConfigurationInitFile, solrlazy);
+            final CollectionConfiguration solrCollectionConfigurationInit = new CollectionConfiguration(solrCollectionConfigurationInitURL, solrlazy);
             solrCollectionConfigurationWork = new CollectionConfiguration(solrCollectionConfigurationWorkFile, solrlazy);
             // update the working scheme with the backup scheme. This is necessary to include new features.
             // new features are always activated by default (if activated in input-backupScheme)
@@ -510,12 +511,12 @@ public final class Switchboard extends serverSwitch {
         
         // initialize the webgraph schema if it does not yet exist
         if (!solrWebgraphConfigurationWorkFile.exists()) try {
-            Files.copy(solrWebgraphConfigurationInitFile, solrWebgraphConfigurationWorkFile);
+            FileUtils.copy(solrWebgraphConfigurationInitURL.openStream(), solrWebgraphConfigurationWorkFile);
         } catch (final IOException e) {ConcurrentLog.logException(e);}
         
         // define webgraph schema
         try {
-            final WebgraphConfiguration solrWebgraphConfigurationInit = new WebgraphConfiguration(solrWebgraphConfigurationInitFile, solrlazy);
+            final WebgraphConfiguration solrWebgraphConfigurationInit = new WebgraphConfiguration(solrWebgraphConfigurationInitURL, solrlazy);
             solrWebgraphConfigurationWork = new WebgraphConfiguration(solrWebgraphConfigurationWorkFile, solrlazy);
             solrWebgraphConfigurationWork.fill(solrWebgraphConfigurationInit, true);
             solrWebgraphConfigurationWork.commit();
@@ -644,24 +645,7 @@ public final class Switchboard extends serverSwitch {
         }
 
         // load coloured lists
-        if ( blueList == null ) {
-            // read only once upon first instantiation of this class
-            final String f =
-                getConfig(SwitchboardConstants.LIST_BLUE, SwitchboardConstants.LIST_BLUE_DEFAULT);
-            final File plasmaBlueListFile = new File(f);
-            if ( f != null ) {
-                blueList = SetTools.loadList(plasmaBlueListFile, NaturalOrder.naturalComparator);
-            } else {
-                blueList = new TreeSet<String>();
-            }
- //         blueListHashes = Word.words2hashesHandles(blueList);
-            this.log.config("loaded blue-list from file "
-                + plasmaBlueListFile.getName()
-                + ", "
-                + blueList.size()
-                + " entries, "
-                + ppRamString(plasmaBlueListFile.length() / 1024));
-        }
+        loadBlueList();
 
         // load blacklist
         this.log.config("Loading blacklist ...");
@@ -673,46 +657,10 @@ public final class Switchboard extends serverSwitch {
         ListManager.reloadBlacklists();
 
         // load badwords (to filter the topwords)
-        if ( badwords == null || badwords.isEmpty() ) {
-            File badwordsFile = new File(appPath, "DATA/SETTINGS/" + SwitchboardConstants.LIST_BADWORDS_DEFAULT);
-            if (!badwordsFile.exists()) {
-                badwordsFile = new File(appPath, "defaults/" + SwitchboardConstants.LIST_BADWORDS_DEFAULT);
-            }
-            badwords = SetTools.loadList(badwordsFile, NaturalOrder.naturalComparator);
-//          badwordHashes = Word.words2hashesHandles(badwords);
-            this.log.config("loaded badwords from file "
-                + badwordsFile.getName()
-                + ", "
-                + badwords.size()
-                + " entries, "
-                + ppRamString(badwordsFile.length() / 1024));
-        }
+        loadBadwords(dataPath);
 
         // load stopwords (to filter query and topwords)
-        if ( stopwords == null || stopwords.isEmpty() ) {
-            File stopwordsFile = new File(dataPath, "DATA/SETTINGS/" + SwitchboardConstants.LIST_STOPWORDS_DEFAULT);
-            if (!stopwordsFile.exists()) {
-                stopwordsFile = new File(appPath, "defaults/"+SwitchboardConstants.LIST_STOPWORDS_DEFAULT);
-            }
-            stopwords = SetTools.loadList(stopwordsFile, NaturalOrder.naturalComparator);
-            // append locale language stopwords using setting of interface language (file yacy.stopwords.xx)
-            String lng = this.getConfig("locale.language", "en");
-            if ("default".equals(lng)) lng="en"; // english is stored as default (needed for locale html file overlay)
-            File stopwordsFilelocale = new File (dataPath, "DATA/SETTINGS/"+stopwordsFile.getName()+"."+lng);
-            if (!stopwordsFilelocale.exists()) stopwordsFilelocale = new File (appPath, "defaults/"+stopwordsFile.getName()+"."+lng);
-            if (stopwordsFilelocale.exists()) {
-                // load YaCy locale stopword list
-                stopwords.addAll(SetTools.loadList(stopwordsFilelocale, NaturalOrder.naturalComparator));
-                this.log.config("append stopwords from file " + stopwordsFilelocale.getName());
-            } else {
-                // alternatively load/append default solr stopword list
-                stopwordsFilelocale = new File (appPath, "defaults/solr/lang/stopwords_" + lng + ".txt");
-                if (stopwordsFilelocale.exists()) {
-                    stopwords.addAll(SetTools.loadList(stopwordsFilelocale, NaturalOrder.naturalComparator));
-                    this.log.config("append stopwords from file " + stopwordsFilelocale.getName());
-                }
-            }
-        }
+        loadStopWords(dataPath, appPath);
 
         // start a cache manager
         this.log.config("Starting HT Cache Manager");
@@ -742,14 +690,7 @@ public final class Switchboard extends serverSwitch {
         this.surrogatesOutPath.mkdirs();
 
         // copy opensearch heuristic config (if not exist)
-        final File osdConfig = new File(getDataPath(), "DATA/SETTINGS/heuristicopensearch.conf");
-        if (!osdConfig.exists()) {
-            final File osdDefaultConfig = new File(appPath, "defaults/heuristicopensearch.conf");
-            this.log.info("heuristic.opensearch list Path = " + osdDefaultConfig.getAbsolutePath());
-            try {
-                Files.copy(osdDefaultConfig, osdConfig);
-            } catch (final IOException ex) { }
-        }
+        copyDefaultsConfigIfNotExists(getDataPath(), "heuristicopensearch.conf");
 
         // create the release download directory
         this.releasePath =
@@ -795,19 +736,20 @@ public final class Switchboard extends serverSwitch {
         }
 
         // init html parser evaluation scheme
-        File parserPropertiesPath = new File(appPath, "defaults/");
+		List<URL> defaultSettingsList = ResourceUtils.listFileResources(SwitchboardConstants.DEFAULTS_RESOURCES_DIR);
+		for (final URL settingURL : defaultSettingsList) {
+			String setttingFileName = ResourceUtils.getFileName(settingURL);
+			if (setttingFileName.startsWith("parser.") && setttingFileName.endsWith(".properties")) {
+				try {
+					Evaluation.add(settingURL);
+				} catch (final IOException e) {
+					ConcurrentLog.logException(e);
+				}
+			}
+		}
+        
+        File parserPropertiesPath = new File(getDataPath(), "DATA/SETTINGS/");
         String[] settingsList = parserPropertiesPath.list();
-        for ( final String l : settingsList ) {
-            if ( l.startsWith("parser.") && l.endsWith(".properties") ) {
-                try {
-                    Evaluation.add(new File(parserPropertiesPath, l));
-                } catch (final IOException e) {
-                    ConcurrentLog.logException(e);
-                }
-            }
-        }
-        parserPropertiesPath = new File(getDataPath(), "DATA/SETTINGS/");
-        settingsList = parserPropertiesPath.list();
         for ( final String l : settingsList ) {
             if ( l.startsWith("parser.") && l.endsWith(".properties") ) {
                 try {
@@ -878,8 +820,7 @@ public final class Switchboard extends serverSwitch {
 
         // load oai tables
         final Map<String, File> oaiFriends =
-            OAIListFriendsLoader.loadListFriendsSources(
-                new File(appPath, "defaults/oaiListFriendsSource.xml"),
+            OAIListFriendsLoader.loadListFriendsSources(this.getClass().getResource("/defaults/oaiListFriendsSource.xml"),
                 getDataPath());
         OAIListFriendsLoader.init(this.loader, oaiFriends, ClientIdentification.yacyInternetCrawlerAgent);
         this.crawlQueues = new CrawlQueues(this, this.queuesRoot);
@@ -905,18 +846,26 @@ public final class Switchboard extends serverSwitch {
         this.remoteSearchTracker = new ConcurrentHashMap<String, TreeSet<Long>>();
 
         // init messages: clean up message symbol
-        final File notifierSource =
-            new File(getAppPath(), getConfig(
-                SwitchboardConstants.HTROOT_PATH,
-                SwitchboardConstants.HTROOT_PATH_DEFAULT) + "/env/grafics/empty.gif");
-        final File notifierDest =
-            new File(
-                getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT),
-                "notifier.gif");
-        try {
-            Files.copy(notifierSource, notifierDest);
-        } catch (final IOException e ) {
-        }
+		URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
+				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+		if (htrootURL == null) {
+			ConcurrentLog.severe("Switchboard", "htroot not found!");
+		} else {
+			try {
+				URL notifierSource = new URL(htrootURL, "env/grafics/empty.gif");
+				final File notifierDest = new File(
+						getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT),
+						"notifier.gif");
+				try {
+					FileUtils.copy(notifierSource, notifierDest);
+				} catch (final IOException e) {
+					ConcurrentLog.warn("Switchboard", "Error copying /env/grafics/empty.gif");
+				}
+			} catch (MalformedURLException e1) {
+				ConcurrentLog.warn("Switchboard",
+						"could not happen /env/grafics/empty.gif to " + htrootURL.toExternalForm());
+			}
+		}
 
         // init nameCacheNoCachingList
         try {
@@ -1175,6 +1124,251 @@ public final class Switchboard extends serverSwitch {
         this.log.config("Finished Switchboard Initialization");
     }
 
+	/**
+	 * Initialize work path and loads work files
+	 */
+	protected void loadWorkPath() {
+		this.workPath = getDataPath(SwitchboardConstants.WORK_PATH, SwitchboardConstants.WORK_PATH_DEFAULT);
+		this.workPath.mkdirs();
+		// if default work files exist, copy them (don't overwrite existing!)
+		for (URL resourceURL : ResourceUtils.listFileResources(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + "data/work/")) {
+			String fileName = ResourceUtils.getFileName(resourceURL);
+			if (!fileName.isEmpty()) {
+				File wf = new File(this.workPath, resourceURL.getFile());
+				if (!wf.exists()) {
+					try {
+						FileUtils.copy(resourceURL.openStream(), wf);
+					} catch (final IOException e) {
+						ConcurrentLog.logException(e);
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Load coloured lists
+	 */
+	protected void loadBlueList() {
+		if ( blueList == null ) {
+            // read only once upon first instantiation of this class
+            final String f =
+                getConfig(SwitchboardConstants.LIST_BLUE, SwitchboardConstants.LIST_BLUE_DEFAULT);
+            if ( f != null ) {
+                final File plasmaBlueListFile = new File(f);
+                if(plasmaBlueListFile.exists()) {
+                	try {
+						blueList = SetTools.loadList(new FileReader(plasmaBlueListFile), NaturalOrder.naturalComparator);
+	                    this.log.config("loaded blue-list from file "
+	                            + plasmaBlueListFile.getName()
+	                            + ", "
+	                            + blueList.size()
+	                            + " entries, "
+	                            + ppRamString(plasmaBlueListFile.length() / 1024));
+					} catch (FileNotFoundException ignored) {
+					}
+                } else {
+                	blueList = new TreeSet<String>();
+                }
+            } else {
+                blueList = new TreeSet<String>();
+            }
+ //         blueListHashes = Word.words2hashesHandles(blueList);
+        }
+	}
+	
+	/**
+	 * Try to load properties from default config file
+	 * @param configFile config file name in /defaults/ classpath directory
+	 * @return properties filled from config file
+	 * @throws IOException when a read error occured or config file doesn't exist
+	 */
+	public Properties loadDefaultProperties(String configFile) throws IOException {
+		if(configFile == null || configFile.isEmpty()) {
+			throw new FileNotFoundException();
+		}
+        final Properties config = new Properties();
+        InputStream initStream = null;
+        try {
+        	initStream = this.getClass().getResourceAsStream(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + configFile);
+        	if(initStream != null) {
+        		config.load(new InputStreamReader(initStream, StandardCharsets.UTF_8));
+        	} else {
+        		throw new FileNotFoundException();
+        	}
+        } finally {
+            if (initStream != null) {
+                try {
+                	initStream.close();
+                } catch (final IOException e) {
+                    ConcurrentLog.logException(e);
+                }
+            }
+        }
+        return config;
+	}
+	
+	/**
+	 * Check if configuration file exists, and try to copy from defaults resources if not.
+	 * @param dataPath parent DATA folder. Must not be null.
+	 * @param fileName configuration file name. Must not be null
+	 * @return true when no error occured during copy
+	 */
+	public boolean copyDefaultsConfigIfNotExists(final File dataPath, String fileName) {
+		boolean copyOK = true;
+		final File configFile = new File(dataPath, "DATA/SETTINGS/" + fileName);
+
+		if (!configFile.exists()) {
+			InputStream configStream = this.getClass().getResourceAsStream(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + fileName);
+			if (configStream != null) {
+				try {
+					FileUtils.copy(configStream, configFile);
+				} catch (final IOException ex) {
+					copyOK = false;
+					ConcurrentLog.logException(ex);
+				}
+			}
+		}
+		return copyOK;
+	}
+	
+	/**
+	 * Check if configuration directory exists, and try to copy from defaults resources if not.
+	 * @param dataPath parent DATA folder. Must not be null.
+	 * @param dirName configuration directory name. Must not be null
+	 * @return true when no error occured during copy
+	 */
+	public boolean copyDefaultsConfigDirIfNotExists(final File dataPath, String dirName) {
+		boolean copyOK = true;
+		final File configDir = new File(dataPath, "DATA/SETTINGS/" + dirName);
+
+		if (!configDir.isDirectory()) {
+			List<URL> resources = ResourceUtils.listFileResources(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + dirName);
+			for (URL resourceURL : resources) {
+				try {
+					InputStream configStream = resourceURL.openStream();
+					if (configStream != null) {
+						String parentDirURL = ResourceUtils.getParentDir(resourceURL);
+						int subIndex = parentDirURL.indexOf(SwitchboardConstants.DEFAULTS_RESOURCES_DIR);
+						if(subIndex >= 0) {
+							String parentDirpath = parentDirURL.substring(subIndex  + SwitchboardConstants.DEFAULTS_RESOURCES_DIR.length());
+							String fileName = ResourceUtils.getFileName(resourceURL);
+							File fileDir = new File("DATA/SETTINGS/" + parentDirpath);
+							/* Ensure any intermediate directories are created */
+							fileDir.mkdirs();
+							File configFile = new File(dataPath, "DATA/SETTINGS/" + parentDirpath + fileName);
+							
+							FileUtils.copy(configStream, configFile);
+						}
+					}
+				} catch (final IOException ex) {
+					copyOK = false;
+					ConcurrentLog.logException(ex);
+				}
+			}
+		}
+		return copyOK;
+	}
+	
+	/**
+	 * Try to open a reader on settings file or from "defaults" classpath resource
+	 * @param dataPath parent DATA folder. Must not be null.
+	 * @param fileName configuration file name. Must not be null
+	 * @return an open Reader or null if no file is readable nor exists
+	 */
+	public Reader openConfigOrDefaultReader(final File dataPath, final String fileName) {
+		Reader reader = null;
+        File confFile = new File(dataPath, "DATA/SETTINGS/" + fileName);
+        if (confFile.exists()) {
+        	try {
+				reader = new FileReader(confFile);
+			} catch (FileNotFoundException ignored) {
+				/* Default resource will be open */
+			}
+        } 
+        if(reader == null) {
+        	InputStream confDefaultStream = this.getClass().getResourceAsStream(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + fileName);
+        	if(confDefaultStream != null) {
+        		reader = new InputStreamReader(confDefaultStream, StandardCharsets.UTF_8);
+        	}
+        }
+        return reader;
+	}
+
+	/**
+	 * @param dataPath
+	 * @param appPath
+	 */
+	protected void loadStopWords(final File dataPath, final File appPath) {
+		if ( stopwords == null || stopwords.isEmpty() ) {
+			Reader stopwordsReader = openConfigOrDefaultReader(dataPath, SwitchboardConstants.LIST_STOPWORDS_DEFAULT);
+            stopwords = SetTools.loadList(stopwordsReader, NaturalOrder.naturalComparator);
+            
+            // append locale language stopwords using setting of interface language (file yacy.stopwords.xx)
+            String lng = this.getConfig("locale.language", "en");
+            if ("default".equals(lng)) {
+            	lng = "en"; // english is stored as default (needed for locale html file overlay)
+            }
+            String localFileName = SwitchboardConstants.LIST_STOPWORDS_DEFAULT + "." +lng;
+            Reader stopwordsLocaleReader = openConfigOrDefaultReader(dataPath, localFileName);
+
+            if (stopwordsLocaleReader != null) {
+                // load YaCy locale stopword list
+                stopwords.addAll(SetTools.loadList(stopwordsLocaleReader, NaturalOrder.naturalComparator));
+                this.log.config("append stopwords from file " + localFileName);
+            } else {
+                // alternatively load/append default solr stopword list
+            	localFileName = "stopwords_" + lng + ".txt";
+            	InputStream confDefaultStream = this.getClass().getResourceAsStream("/defaults/solr/lang/" + localFileName);
+				if (confDefaultStream != null) {
+					stopwordsLocaleReader = new InputStreamReader(confDefaultStream, StandardCharsets.UTF_8);
+					stopwords.addAll(SetTools.loadList(stopwordsLocaleReader, NaturalOrder.naturalComparator));
+					this.log.config("append stopwords from file " + localFileName);
+				}
+            }
+        }
+	}
+
+	/**
+	 * Load badwords from settings or defaults
+	 * @param dataPath data parent directory
+	 */
+	protected void loadBadwords(final File dataPath) {
+		if (badwords == null || badwords.isEmpty()) {
+			File badwordsFile = new File(dataPath, "DATA/SETTINGS/" + SwitchboardConstants.LIST_BADWORDS_DEFAULT);
+			String badwordsPath = badwordsFile.getAbsolutePath();
+			long fileSize = badwordsFile.length();
+			Reader badwordsReader = null;
+			if (badwordsFile.exists()) {
+				try {
+					badwordsReader = new FileReader(badwordsFile);
+				} catch (FileNotFoundException ignored) {
+				}
+			}
+			if (badwordsReader == null) {
+				URL badwordsDefaultsURL = this.getClass()
+						.getResource(SwitchboardConstants.DEFAULTS_RESOURCES_DIR + SwitchboardConstants.LIST_BADWORDS_DEFAULT);
+				if (badwordsDefaultsURL != null) {
+					try {
+						URLConnection badwordsConn = badwordsDefaultsURL.openConnection();
+						badwordsReader = new InputStreamReader(badwordsConn.getInputStream(), StandardCharsets.UTF_8);
+						badwordsPath = badwordsDefaultsURL.toString();
+						fileSize = badwordsConn.getContentLengthLong();
+					} catch (IOException ignored) {
+					}
+				}
+			}
+			if (badwordsReader != null) {
+				badwords = SetTools.loadList(badwordsReader, NaturalOrder.naturalComparator);
+				String sizeMessage = "";
+				if(fileSize > 0) {
+					sizeMessage = ", " + ppRamString(badwordsFile.length() / 1024);
+				}
+				this.log.config("loaded badwords from file " + badwordsPath + ", " + badwords.size() + " entries" + sizeMessage);
+			}
+		}
+	}
+
     final String getSysinfo() {
         return getConfig(SwitchboardConstants.NETWORK_NAME, "") + (isRobinsonMode() ? "-" : "/") + getConfig(SwitchboardConstants.NETWORK_DOMAIN, "global");
     }
@@ -1205,12 +1399,12 @@ public final class Switchboard extends serverSwitch {
 
         // load network configuration into settings
         String networkUnitDefinition =
-            getConfig("network.unit.definition", "defaults/yacy.network.freeworld.unit");
-        if (networkUnitDefinition.isEmpty()) networkUnitDefinition = "defaults/yacy.network.freeworld.unit"; // patch for a strange failure case where the path was overwritten by empty string
+            getConfig("network.unit.definition", "/defaults/yacy.network.freeworld.unit");
+        if (networkUnitDefinition.isEmpty()) networkUnitDefinition = "/defaults/yacy.network.freeworld.unit"; // patch for a strange failure case where the path was overwritten by empty string
 
         // patch old values
         if ( networkUnitDefinition.equals("yacy.network.unit") ) {
-            networkUnitDefinition = "defaults/yacy.network.freeworld.unit";
+            networkUnitDefinition = "/defaults/yacy.network.freeworld.unit";
             setConfig("network.unit.definition", networkUnitDefinition);
         }
 
@@ -1238,7 +1432,7 @@ public final class Switchboard extends serverSwitch {
             getConfigFileFromWebOrLocally(networkUnitDefinition, getAppPath().getAbsolutePath(), new File(
                 this.workPath,
                 "network.definition.backup"));
-        initProps = FileUtils.table(netDefReader);
+        initProps = FileUtils.loadMap(netDefReader);
         setConfig(initProps);
 
         // set release locations
@@ -1286,8 +1480,8 @@ public final class Switchboard extends serverSwitch {
 
         /*
         // in intranet and portal network set robinson mode
-        if (networkUnitDefinition.equals("defaults/yacy.network.webportal.unit") ||
-            networkUnitDefinition.equals("defaults/yacy.network.intranet.unit")) {
+        if (networkUnitDefinition.equals("/defaults/yacy.network.webportal.unit") ||
+            networkUnitDefinition.equals("/defaults/yacy.network.intranet.unit")) {
             // switch to robinson mode
             setConfig("crawlResponse", "false");
             setConfig(plasmaSwitchboardConstants.INDEX_DIST_ALLOW, false);
@@ -1295,7 +1489,7 @@ public final class Switchboard extends serverSwitch {
         }
 
         // in freeworld network set full p2p mode
-        if (networkUnitDefinition.equals("defaults/yacy.network.freeworld.unit")) {
+        if (networkUnitDefinition.equals("/defaults/yacy.network.freeworld.unit")) {
             // switch to robinson mode
             setConfig("crawlResponse", "true");
             setConfig(plasmaSwitchboardConstants.INDEX_DIST_ALLOW, true);

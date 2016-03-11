@@ -21,30 +21,34 @@ package net.yacy;
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-import net.yacy.search.index.ReindexSolrBusyThread;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import net.yacy.cora.order.Base64Order;
-import net.yacy.cora.order.Digest;
-import net.yacy.kelondro.util.FileUtils;
-import net.yacy.search.Switchboard;
-import net.yacy.search.SwitchboardConstants;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.client.solrj.response.LukeResponse.FieldInfo;
 
 import com.google.common.io.Files;
+
+import net.yacy.cora.order.Base64Order;
+import net.yacy.cora.order.Digest;
 import net.yacy.cora.protocol.TimeoutRequest;
 import net.yacy.cora.storage.Configuration.Entry;
 import net.yacy.cora.util.ConcurrentLog;
+import net.yacy.kelondro.util.FileUtils;
+import net.yacy.kelondro.util.ResourceUtils;
 import net.yacy.kelondro.workflow.BusyThread;
+import net.yacy.search.Switchboard;
+import net.yacy.search.SwitchboardConstants;
+import net.yacy.search.index.ReindexSolrBusyThread;
 import net.yacy.search.schema.CollectionConfiguration;
 import net.yacy.search.schema.CollectionSchema;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.response.LukeResponse.FieldInfo;
 
 public class migration {
     //SVN constants
@@ -101,31 +105,31 @@ public class migration {
             delete(file);
     }
 
-    /*
+    /**
      * copy skins from the release to DATA/SKINS.
+     * @param sb Switchboard instance
      */
     public static void installSkins(final Switchboard sb){
-        final File skinsPath = sb.getDataPath("skinPath", SwitchboardConstants.SKINS_PATH_DEFAULT);
-        final File defaultSkinsPath = new File(sb.getAppPath(), "skins");
-        if (defaultSkinsPath.exists()) {
-            final List<String> skinFiles = FileUtils.getDirListing(defaultSkinsPath.getAbsolutePath());
-            mkdirs(skinsPath);
-            for (final String skinFile : skinFiles){
-                if (skinFile.endsWith(".css")){
-                    final File from = new File(defaultSkinsPath, skinFile);
-                    final File to = new File(skinsPath, skinFile);
-                    if (from.lastModified() > to.lastModified()) try {
-                        Files.copy(from, to);
-                    } catch (final IOException e) {}
-                }
-            }
-        }
+        final File skinsPath = sb.getDataPath(SwitchboardConstants.SKINS_PATH, SwitchboardConstants.SKINS_PATH_DEFAULT);
+        mkdirs(skinsPath);
+        final List<URL> skinResources = ResourceUtils.listFileResources("/skins");
+		for (final URL skinResource : skinResources) {
+			if (skinResource.getFile().endsWith(".css")) {
+				try {
+					URLConnection fromConn = skinResource.openConnection();
+					final File to = new File(skinsPath, ResourceUtils.getFileName(skinResource));
+					if (fromConn.getLastModified() > to.lastModified()) {
+						FileUtils.copy(fromConn.getInputStream(), to);
+					}
+				} catch (final IOException e) {
+				}
+			}
+		}
         String skin=sb.getConfig("currentSkin", "default");
         if(skin.equals("")){
             skin="default";
         }
-        final File skinsDir=sb.getDataPath("skinPath", SwitchboardConstants.SKINS_PATH_DEFAULT);
-        final File skinFile=new File(skinsDir, skin+".css");
+        final File skinFile=new File(skinsPath, skin+".css");
         final File htdocsPath=new File(sb.getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT), "env");
         final File styleFile=new File(htdocsPath, "style.css");
         if(!skinFile.exists()){

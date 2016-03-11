@@ -2407,7 +2407,6 @@ public class MultiProtocolURL implements Serializable, Comparable<MultiProtocolU
           new String[]{null, "http://test.net/test2.htm?s=multiple&amp;amp;amp;amp;a=amp"},
           new String[]{null, "http://validator.w3.org/check?uri=http://www.anomic.de/"}
           };
-        //MultiProtocolURI.initSessionIDNames(FileUtils.loadList(new File("defaults/sessionid.names")));
         String environment, url;
         MultiProtocolURL aURL, aURL1;
         java.net.URL jURL;

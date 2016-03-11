@@ -24,11 +24,11 @@ package net.yacy.document.importer;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -39,6 +39,10 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.document.id.DigestURL;
 import net.yacy.cora.federate.yacy.CacheStrategy;
@@ -47,10 +51,6 @@ import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.crawler.retrieval.Response;
 import net.yacy.kelondro.util.FileUtils;
 import net.yacy.repository.LoaderDispatcher;
-
-import org.xml.sax.Attributes;
-import org.xml.sax.SAXException;
-import org.xml.sax.helpers.DefaultHandler;
 
 
 public class OAIListFriendsLoader implements Serializable {
@@ -69,11 +69,22 @@ public class OAIListFriendsLoader implements Serializable {
         }
     }
 
-    public static Map<String, File> loadListFriendsSources(final File initFile, final File dataPath) {
+    /**
+     * Load list of friends sources from initFile
+     * @param initFile file with list of friends sources files
+     * @param dataPath data path
+     * @return a map eventually empty
+     */
+    public static Map<String, File> loadListFriendsSources(final URL initFile, final File dataPath) {
         final Properties p = new Properties();
         final Map<String, File> m = new HashMap<String, File>();
         try {
-            p.loadFromXML(new FileInputStream(initFile));
+        	if(initFile != null) {
+        		InputStream initStream = initFile.openStream();
+        		if(initStream != null) {
+        			p.loadFromXML(initStream);
+        		}
+        	}
         } catch (final IOException e) {
             ConcurrentLog.logException(e);
             return m;

@@ -23,20 +23,25 @@ package net.yacy.cora.federate.solr.instance;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import net.yacy.cora.document.encoding.ASCII;
-import net.yacy.cora.util.ConcurrentLog;
-import net.yacy.kelondro.util.MemoryControl;
-
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.embedded.EmbeddedSolrServer;
 import org.apache.solr.core.CoreContainer;
+import org.apache.solr.core.NodeConfig;
 import org.apache.solr.core.SolrCore;
+import org.apache.solr.core.SolrResourceLoader;
+import org.apache.solr.core.SolrXmlConfig;
 
-import com.google.common.io.Files;
+import net.yacy.cora.document.encoding.ASCII;
+import net.yacy.cora.util.ConcurrentLog;
+import net.yacy.kelondro.util.FileUtils;
+import net.yacy.kelondro.util.MemoryControl;
+import net.yacy.kelondro.util.ResourceUtils;
 
 public class EmbeddedInstance implements SolrInstance {
     
@@ -50,8 +55,19 @@ public class EmbeddedInstance implements SolrInstance {
     private Map<String, SolrCore> cores;
     private Map<String, SolrClient> server;
 
-    public EmbeddedInstance(final File solr_config, final File containerPath, String givenDefaultCoreName, String[] initializeCoreNames) throws IOException {
+    /**
+     * Creates an embeddedInstance
+     * @param solrResourcesDir solr classpath resources folder
+     * @param containerPath
+     * @param givenDefaultCoreName
+     * @param initializeCoreNames
+     * @throws IOException
+     */
+    public EmbeddedInstance(String solrResourcesDir, final File containerPath, String givenDefaultCoreName, String[] initializeCoreNames) throws IOException {
         super();
+        if(!solrResourcesDir.endsWith("/")) {
+        	solrResourcesDir += "/";
+        }
         // copy the solrconfig.xml to the storage path
         this.containerPath = containerPath;
         
@@ -75,13 +91,28 @@ public class EmbeddedInstance implements SolrInstance {
         
         // initialize the cores' configuration
         for (String coreName: initializeCoreNames) {
-            initializeCoreConf(solr_config, containerPath, coreName);
+            initializeCoreConf(solrResourcesDir, containerPath, coreName);
         }
         
         // initialize the coreContainer
-        File configFile = new File(solr_config, "solr.xml"); //  the configuration file for all cores
-        this.coreContainer = CoreContainer.createAndLoad(containerPath.toPath(), configFile.toPath()); // this may take indefinitely long if solr files are broken
-        if (this.coreContainer == null) throw new IOException("cannot create core container dir = " + containerPath + ", configFile = " + configFile);
+        URL configFileURL = this.getClass().getResource(solrResourcesDir + "solr.xml"); //  the configuration file for all cores
+        if(configFileURL == null) {
+        	throw new IOException("Cannot find configFile in classpath : " + solrResourcesDir + "solr.xml");
+        }
+        
+        NodeConfig config = SolrXmlConfig.fromInputStream(new SolrResourceLoader(containerPath.toPath()), configFileURL.openStream());
+        if(config == null) {
+        	throw new IOException("Cannot parse configFile = " + solrResourcesDir + "solr.xml");
+        }
+        try {
+        	this.coreContainer = new CoreContainer(config);
+        	this.coreContainer.load();
+        } catch(Exception e) {
+        	if(coreContainer != null) {
+        		this.coreContainer.shutdown();
+        	}
+        	throw new IOException("Cannot load solr container", e);
+        } 
 
         // get the default core from the coreContainer
         this.defaultCoreName = givenDefaultCoreName;
@@ -110,7 +141,12 @@ public class EmbeddedInstance implements SolrInstance {
         return o instanceof EmbeddedInstance && this.containerPath.equals(((EmbeddedInstance) o).containerPath);
     }
     
-    private static void initializeCoreConf(final File solr_config, final File containerPath, String coreName) {
+    /**
+     * @param solr_config parent classpath resource directory
+     * @param containerPath target directory
+     * @param coreName Solr core name
+     */
+    private static void initializeCoreConf(final String solr_config, final File containerPath, String coreName) {
 
         // ensure that default core path exists
         File corePath = new File(containerPath, coreName);
@@ -120,17 +156,25 @@ public class EmbeddedInstance implements SolrInstance {
         File core_properties = new File(corePath, "core.properties");
         if (!core_properties.exists()) {
             // create the file
+        	FileOutputStream fos = null;
             try {
-                FileOutputStream fos = new FileOutputStream(core_properties);
+                fos = new FileOutputStream(core_properties);
                 fos.write(ASCII.getBytes("name=" + coreName + "\n"));
                 fos.write(ASCII.getBytes("shard=${shard:}\n"));
                 fos.write(ASCII.getBytes("collection=${collection:" + coreName + "}\n"));
                 fos.write(ASCII.getBytes("config=${solrconfig:solrconfig.xml}\n"));
                 fos.write(ASCII.getBytes("schema=${schema:schema.xml}\n"));
                 fos.write(ASCII.getBytes("coreNodeName=${coreNodeName:}\n"));
-                fos.close();
             } catch (IOException e) {
                 ConcurrentLog.logException(e);
+            } finally {
+            	if(fos != null) {
+                    try {
+						fos.close();
+					} catch (IOException e) {
+						ConcurrentLog.logException(e);
+					}            		
+            	}
             }
         }
 
@@ -141,50 +185,61 @@ public class EmbeddedInstance implements SolrInstance {
         data.mkdirs();
         
         // (over-)write configuration into conf path
-        File source, target;
-        for (String cf: confFiles) {
-            source = new File(solr_config, cf);
-            if (source.isDirectory()) {
-                target = new File(conf, cf);
-                target.mkdirs();
-                for (String cfl: source.list()) {
-                    try {
-                        Files.copy(new File(source, cfl), new File(target, cfl));
-                    } catch (final IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-            } else {
-                target = new File(conf, cf);
-                target.getParentFile().mkdirs();
-                try {                                       
-                    Files.copy(source, target);
-                } catch (final IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
+		File target;
+		for (String cf : confFiles) {
+			String resource = solr_config + cf;
+			if (ResourceUtils.isResourceDir(resource)) {
+				target = new File(conf, cf);
+				target.mkdirs();
+
+				for (URL sourceURL : ResourceUtils.listFileResources(resource)) {
+					try {
+						InputStream sourceStream = sourceURL.openStream();
+						if (sourceStream != null) {
+							FileUtils.copy(sourceStream, new File(target, ResourceUtils.getFileName(sourceURL)));
+						}
+					} catch (final IOException e) {
+						e.printStackTrace();
+					}
+				}
+			} else {
+				URL sourceURL = EmbeddedInstance.class.getResource(resource);
+				if (sourceURL != null) {
+					try {
+						InputStream sourceStream = sourceURL.openStream();
+						if (sourceStream != null) {
+							target = new File(conf, cf);
+							target.getParentFile().mkdirs();
+							FileUtils.copy(sourceStream, target);
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		}
         
         // copy the solrcore.properties
         // for 32bit systems (os.arch name not containing '64') take the solrcore.x86.properties as solrcore.properties if exists
-        String os = System.getProperty("os.arch");            
+        String os = System.getProperty("os.arch");
+        URL sourceURL = null;
         if (os.contains("64")) {
-            source = new File(solr_config, "solrcore.properties");
+        	sourceURL = EmbeddedInstance.class.getResource(solr_config + "solrcore.properties");
         } else {
-            source = new File(solr_config, "solrcore.x86.properties");
-            if (!source.exists()) {
-                source = new File(solr_config, "solrcore.properties");
+        	sourceURL = EmbeddedInstance.class.getResource(solr_config + "solrcore.x86.properties");
+            if (sourceURL == null) {
+            	sourceURL = EmbeddedInstance.class.getResource(solr_config + "solrcore.properties");
             }
         }
         // solr alwasy reads the solrcore.properties file if exists in core/conf directory
         target = new File(conf, "solrcore.properties");
 
-        if (source.exists()) {
+        if (sourceURL != null) {
             try {
-                Files.copy(source, target);
-                ConcurrentLog.fine("initializeCoreConf", "overwrite " + target.getAbsolutePath() + " with " + source.getAbsolutePath());
+            	FileUtils.copy(sourceURL.openStream(), target);
+                ConcurrentLog.fine("initializeCoreConf", "overwrite " + target.getAbsolutePath() + " with " + sourceURL.getFile());
             } catch (final IOException ex) {
-                ex.printStackTrace();
+                ConcurrentLog.logException(ex);
             }
         }
       

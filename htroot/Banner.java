@@ -26,8 +26,9 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 
 import javax.imageio.ImageIO;
 
@@ -42,13 +43,18 @@ import net.yacy.visualization.RasterPlotter;
 
 /** Draw a banner with information about the peer. */
 public class Banner {
+	
 
     public static RasterPlotter respond(
         @SuppressWarnings("unused") final RequestHeader header,
         final serverObjects post,
         final serverSwitch env) throws IOException {
         final Switchboard sb = (Switchboard) env;
-        final String pathToImage = "htroot/env/grafics/yacy.png";
+        URL htroot = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, "/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+    	if(htroot == null) {
+    		throw new IOException("no htroot found");
+    	}
+    	URL imageURL = new URL(htroot, "env/grafics/yacy.png");
         int width = 468;
         int height = 60;
         String bgcolor = "e7effc";
@@ -120,11 +126,20 @@ public class Banner {
         if (!net.yacy.peers.graphics.Banner.logoIsLoaded()) {
             // do not write a cache to disc; keep in RAM
             ImageIO.setUseCache(false);
-            final BufferedImage logo = ImageIO.read(new File(pathToImage));
+            InputStream imageStream = imageURL.openStream();
+            if(imageStream == null) {
+            	throw new IOException("Banner image URL could not be open : " + imageURL.toExternalForm());
+            }
+            try {
+            final BufferedImage logo = ImageIO.read(imageStream);
             return net.yacy.peers.graphics.Banner.getBannerPicture(
                 data,
                 1000,
                 logo);
+            } finally {
+            	/* ImageIO.read doesn't close stream */
+            	imageStream.close();
+            }
         }
 
         return net.yacy.peers.graphics.Banner.getBannerPicture(data, 1000);

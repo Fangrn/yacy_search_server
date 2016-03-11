@@ -21,80 +21,136 @@
 
 package net.yacy.server;
 
-import java.io.File;
 import java.io.IOException;
-import net.yacy.cora.util.ConcurrentLog;
+import java.io.InputStream;
+import java.net.MalformedURLException;
 
+import org.eclipse.jetty.util.URIUtil;
+import org.eclipse.jetty.util.resource.Resource;
+
+import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.kelondro.util.FileUtils;
-import net.yacy.search.Switchboard;
-import net.yacy.search.SwitchboardConstants;
 
 /**
  * Class loader for servlet classes
  * (findClass looking in default htroot directory)
  */
 public final class serverClassLoader extends ClassLoader {
+	
+//	/** htroot directory resource */
+//	private Resource htroot;
 
-    public serverClassLoader() {
-        //super(ClassLoader.getSystemClassLoader());
+	/**
+	 * Create a loader instance
+	 * @param htRoot htroot directory (classpath or regular resource)
+	 */
+    public serverClassLoader(Resource htRootResource) {
     	super(Thread.currentThread().getContextClassLoader());
+//        if(htRootResource == null) {
+//        	throw new IllegalArgumentException("htrootResource must not be null");
+//        }
+//    	this.htroot = htRootResource;
         if (!registerAsParallelCapable()) { // avoid blocking
-            ConcurrentLog.warn("ClassLoader", "registerAsParallelCapable failed");
+            ConcurrentLog.warn("serverClassLoader", "registerAsParallelCapable failed");
         }
     }
+    
+//	/**
+//	 * Create a loader instance
+//	 * @param htRoot htroot directory (classpath or regular resource)
+//	 */
+//    public serverClassLoader(final ClassLoader parent) {
+//        super(parent);
+//        if (!registerAsParallelCapable()) {
+//            ConcurrentLog.warn("serverClassLoader", "registerAsParallelCapable failed");
+//        }
+//    }
 
-    public serverClassLoader(final ClassLoader parent) {
-        super(parent);
-        if (!registerAsParallelCapable()) {
-            ConcurrentLog.warn("ClassLoader", "registerAsParallelCapable failed");
-        }
-    }
+//    /**
+//     * Find servlet class in htroot directory
+//     * but use the internal loadClass(Resource) method to load the class same way
+//     * (e.g. caching) as direct call to loadClass(File)
+//     * This method is mainly to avoid classpath conflicts for servlet to servlet calls
+//     * making inclusion of htroot in system classpath not crucial
+//     * 
+//     *
+//     * @param binary class name (e.g. java.lang.String is a binary class name)
+//     * @return loaded class
+//     * @throws ClassNotFoundException
+//     */
+//    @Override
+//    protected Class<?> findClass(String classname) throws ClassNotFoundException {
+//    	/* First try to load already loaded class */
+//    	Class<?> c = findLoadedClass(classname);
+//    	if (c != null) {
+//    		return c;
+//    	}
+//    	if(this.htroot == null) {
+//    		throw new ClassNotFoundException(classname);
+//    	}
+//        // construct path to htroot for a servletname
+//        Resource classResource;
+//		try {
+//			classResource = this.htroot.addPath(classname.replace('.', '/') + ".class");
+//		} catch (MalformedURLException e) {
+//			throw new ClassNotFoundException("linkageError, " + e.getMessage() + ":" + classname);
+//		} catch (IOException e) {
+//			throw new ClassNotFoundException(e.getMessage() + ":" + classname);
+//		}
+//		if(classResource == null) {
+//			throw new ClassNotFoundException(classname + " not found in htroot base resource.");
+//		}
+//        return loadClassResource(classResource);
+//    }
 
-    /**
-     * Find servlet class in default htroot directory
-     * but use the internal loadClass(File) methode to load the class same way
-     * (e.g. caching) as direct call to loadClass(File)
-     * This methode is mainly to avoid classpath conflicts for servlet to servlet calls
-     * making inclusion of htroot in system classpath not crucial
-     *
-     * @param servletname (delivered by parent loader without ".class" file extension
-     * @return class in htroot
-     * @throws ClassNotFoundException
-     */
-    @Override
-    protected Class<?> findClass(String classname) throws ClassNotFoundException {
-        // construct path to htroot for a servletname
-        File cpath = new File (Switchboard.getSwitchboard().getDataPath(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT),classname+".class");
-        return loadClass(cpath);
-    }
+	/**
+	 * A special loadClass using file as argument to find and load a class. This
+	 * method is directly called by the application and not part of the normal
+	 * loadClass chain (= never called by JVM)
+	 * 
+	 * @param classfile
+	 *            class file resource. Must not be null.
+	 * @return loaded an resolved class
+	 * @throws ClassNotFoundException when an error occured or when classfile is not a valid class resource
+	 */
+    public Class<?> loadClassResource(final Resource classfile) throws ClassNotFoundException {
 
-    /**
-     * A special loadClass using file as argument to find and load a class
-     * This methode is directly called by the application and not part of the
-     * normal loadClass chain (= never called by JVM)
-     *
-     * @param classfile
-     * @return loaded an resolved class
-     * @throws ClassNotFoundException
-     */
-    public Class<?> loadClass(final File classfile) throws ClassNotFoundException {
-
+    	if(classfile == null) {
+    		throw new ClassNotFoundException("null class resource");
+    	}
         Class<?> c;
-        final int p = classfile.getName().indexOf('.',0);
-        if (p < 0) throw new ClassNotFoundException("wrong class name: " + classfile.getName());
-        final String classname = classfile.getName().substring(0, p);
+        String filePath = classfile.getName();
+        final int dotIndex = filePath.lastIndexOf('.');
+        if (dotIndex < 0) {
+        	throw new ClassNotFoundException("wrong class name: " + filePath);
+        }
+        int startIndex = filePath.lastIndexOf(URIUtil.SLASH);
+        if(startIndex < 0) {
+        	startIndex = 0;
+        } else {
+        	startIndex++;
+        }
+        final String classname = filePath.substring(startIndex, dotIndex);
 
+//        /* First try to find already loaded class */
+//    	c = findLoadedClass(classname);
+//    	if (c != null) {
+//    		return c;
+//    	}
         // load the file from the file system
         byte[] b;
         try {
-            //System.out.println("*** DEBUG CLASSLOADER: " + classfile + "; file " + (classfile.exists() ? "exists": "does not exist"));
-            b = FileUtils.read(classfile);
+        	InputStream classStream = classfile.getInputStream();
+            b = FileUtils.read(classStream);
             // make a class out of the stream
-            c = this.defineClass(null, b, 0, b.length);
+            c = this.defineClass(classname, b, 0, b.length);
             resolveClass(c);
         } catch (final LinkageError ee) {
+        	/* This error may occur when two threads try to define concurrently the same class. Here findLoadedClass should yet return something. */
         	c = findLoadedClass(classname);
-        	if (c != null) return c;
+        	if (c != null) {
+        		return c;
+        	}
             throw new ClassNotFoundException("linkageError, " + ee.getMessage() + ":" + classfile.toString());
         } catch (final IOException ee) {
             throw new ClassNotFoundException(ee.getMessage() + ":" + classfile.toString());

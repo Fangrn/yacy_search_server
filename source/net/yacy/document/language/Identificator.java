@@ -24,12 +24,13 @@
 
 package net.yacy.document.language;
 
-import java.io.File;
 import java.util.ArrayList;
+
 import com.cybozu.labs.langdetect.Detector;
 import com.cybozu.labs.langdetect.DetectorFactory;
 import com.cybozu.labs.langdetect.LangDetectException;
 import com.cybozu.labs.langdetect.Language;
+import com.cybozu.labs.langdetect.ResourceDetectorFactory;
 
 import net.yacy.cora.util.ConcurrentLog;
 
@@ -39,11 +40,13 @@ import net.yacy.cora.util.ConcurrentLog;
 public final class Identificator {
 
     private Detector detector;
-    private Language language;
-
+    
     public Identificator() {
         try {
-            if(DetectorFactory.getLangList().isEmpty()) DetectorFactory.loadProfile(new File("langdetect").toString());
+            if(DetectorFactory.getLangList().isEmpty()) {
+            	/* Load profile from resource directory */
+            	ResourceDetectorFactory.loadProfile("/langdetect");
+            }
             this.detector = DetectorFactory.create();
         } catch (LangDetectException e) {
             ConcurrentLog.logException(e);
@@ -51,8 +54,9 @@ public final class Identificator {
     }
 
     public void add(final String word) {
-        if (word == null) return;
-        this.detector.append(" " + word); // detector internally caches text up to maxtextlen = default = 10000 chars
+        if (word != null && this.detector != null) {
+        	this.detector.append(" " + word); // detector internally caches text up to maxtextlen = default = 10000 chars
+        }
     }
 
     /**
@@ -61,37 +65,46 @@ public final class Identificator {
      * Underlaying detector differentiates zh-cn and zh-tw, these are returned as zh here.
      * @return 2 char language code (ISO 639-1)
      */
-    public String getLanguage() {
-        try {
-            ArrayList<Language> probabilities = this.detector.getProbabilities();
-            if(probabilities.isEmpty()) return null;
-            this.language = this.detector.getProbabilities().get(0);
-        } catch (LangDetectException e) {
-            // this contains mostly the message "no features in text"
-            //ConcurrentLog.logException(e);
-            return null;
-        }
-        // Return language only if probability is higher than 30% to account for missing language profiles
-        if (this.language.prob > 0.3) {
-            if (this.language.lang.length() == 2)
-                return this.language.lang;
-            else
-                return this.language.lang.substring(0,2);
-        }
+    public Language getLanguage() {
+		if (this.detector != null) {
+			Language language = null;
+			try {
+				ArrayList<Language> probabilities = this.detector.getProbabilities();
+				if (probabilities.isEmpty())
+					return null;
+				language = this.detector.getProbabilities().get(0);
+			} catch (LangDetectException e) {
+				// this contains mostly the message "no features in text"
+				// ConcurrentLog.logException(e);
+				return null;
+			}
+			// Return language only if probability is higher than 30% to account
+			// for missing language profiles
+			if (language.prob > 0.3) {
+				return language;
+			}
+		}
 
-        return null;
+		return null;
 
     }
-
+    
     /**
-     * Get the probability of the detected language (returned by {@link #getLanguage()})
-     * @return 0.0 to 1.0
+     * @param language detected language
+     * @return 2 char language code (ISO 639-1) or null when language is not a valid language
      */
-    public double getProbability() {
-        if (language != null) {
-            return language.prob;
-        } else
-            return 0.0;
+    public static String languageCode(Language language) {
+    	String lang = null;
+    	if(language != null && language.lang != null) {
+    		if (language.lang.length() == 2) {
+    			lang = language.lang;
+    		} else if(language.lang.length() > 2){
+    			lang =  language.lang.substring(0, 2);
+    		}
+    	}
+    	return lang;
+    	
     }
+
 
 }

@@ -18,8 +18,8 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.Iterator;
 
 import net.yacy.cora.federate.solr.SchemaConfiguration;
@@ -81,15 +81,16 @@ public class IndexSchema_p {
         }
         
         if (post != null && post.containsKey("resetselectiontodefault")) {
-            // reset Solr field selection to default configuration             
-            File solrInitFile;
+            // reset Solr field selection to default configuration
+        	String solrInitFile;
             if (cs instanceof WebgraphConfiguration) { // get default configuration for webgraph
-                solrInitFile = new File(sb.getAppPath(), "defaults/" + Switchboard.SOLR_WEBGRAPH_CONFIGURATION_NAME);
+            	solrInitFile = "/defaults/" + Switchboard.SOLR_WEBGRAPH_CONFIGURATION_NAME;
             } else { // or get default configuration for collection1
-                solrInitFile = new File(sb.getAppPath(), "defaults/" + Switchboard.SOLR_COLLECTION_CONFIGURATION_NAME);
+            	solrInitFile = "/defaults/" + Switchboard.SOLR_COLLECTION_CONFIGURATION_NAME;
             }
+            URL solrInitURL = IndexSchema_p.class.getResource(solrInitFile);
             try {
-                SchemaConfiguration solrConfigurationInit = new SchemaConfiguration(solrInitFile);
+                SchemaConfiguration solrConfigurationInit = new SchemaConfiguration(solrInitURL);
                 Iterator<SchemaConfiguration.Entry> it = cs.entryIterator(); // get current configuration
                 while (it.hasNext()) { // iterate over entries and enable/disable according to default
                     SchemaConfiguration.Entry etr = it.next();
@@ -97,7 +98,7 @@ public class IndexSchema_p {
                 }
                 cs.commit();
             } catch (final IOException ex) {
-                ConcurrentLog.warn("IndexSchema", "file " + solrInitFile.getAbsolutePath() + " not found");
+                ConcurrentLog.warn("IndexSchema", "file " + solrInitFile + " not found");
             }
         }
         

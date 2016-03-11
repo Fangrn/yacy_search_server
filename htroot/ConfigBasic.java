@@ -28,9 +28,9 @@
 // javac -classpath .:../classes ConfigBasic_p.java
 // if the shell's current path is HTROOT
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URL;
 import java.util.regex.Pattern;
 
 import net.yacy.cora.protocol.Domains;
@@ -46,8 +46,8 @@ import net.yacy.search.SwitchboardConstants;
 import net.yacy.server.serverObjects;
 import net.yacy.server.serverSwitch;
 import net.yacy.server.http.HTTPDFileHandler;
-import net.yacy.utils.upnp.UPnPMappingType;
 import net.yacy.utils.upnp.UPnP;
+import net.yacy.utils.upnp.UPnPMappingType;
 
 public class ConfigBasic {
 
@@ -62,7 +62,6 @@ public class ConfigBasic {
         // return variable that accumulates replacements
         final Switchboard sb = (Switchboard) env;
         final serverObjects prop = new serverObjects();
-        final File langPath = new File(sb.getAppPath("locale.source", "locales").getAbsolutePath());
         String lang = env.getConfig("locale.language", "default");
 
         final int authentication = sb.adminAuthenticated(header);
@@ -84,9 +83,16 @@ public class ConfigBasic {
         }
 
         // language settings
-        if (post != null && post.containsKey("language")  && !lang.equals(post.get("language", "default")) &&
-                (Translator.changeLang(env, langPath, post.get("language", "default") + ".lng"))) {
-            prop.put("changedLanguage", "1");
+        if (post != null && post.containsKey("language")  && !lang.equals(post.get("language", "default"))) {
+        	String newLang = post.get("language", "default");
+        	URL translationFileURL = null;
+            final URL langPath = sb.getAppFileOrDefaultResource("locale.source", "/locales/");
+			if (!"default".equals(newLang) && langPath != null) {
+				translationFileURL = new URL(langPath, newLang + ".lng");
+			}
+        	if(Translator.changeLang(env, translationFileURL, newLang)) {
+        		prop.put("changedLanguage", "1");
+        	}
         }
 
         // peer name settings
@@ -179,7 +185,7 @@ public class ConfigBasic {
             if ("freeworld".equals(post.get("usecase", "")) && !"freeworld".equals(networkName)) {
                 // switch to freeworld network
                 sb.setConfig(SwitchboardConstants.CORE_SERVICE_RWI, true);
-                sb.switchNetwork("defaults/yacy.network.freeworld.unit");
+                sb.switchNetwork("/defaults/yacy.network.freeworld.unit");
                 // switch to p2p mode
                 sb.setConfig(SwitchboardConstants.INDEX_DIST_ALLOW, true);
                 sb.setConfig(SwitchboardConstants.INDEX_RECEIVE_ALLOW, true);
@@ -191,7 +197,7 @@ public class ConfigBasic {
             if ("portal".equals(post.get("usecase", "")) && !"webportal".equals(networkName)) {
                 // switch to webportal network
                 sb.setConfig(SwitchboardConstants.CORE_SERVICE_RWI, false);
-                sb.switchNetwork("defaults/yacy.network.webportal.unit");
+                sb.switchNetwork("/defaults/yacy.network.webportal.unit");
                 // switch to robinson mode
                 sb.setConfig(SwitchboardConstants.INDEX_DIST_ALLOW, false);
                 sb.setConfig(SwitchboardConstants.INDEX_RECEIVE_ALLOW, false);
@@ -203,7 +209,7 @@ public class ConfigBasic {
             if ("intranet".equals(post.get("usecase", "")) && !"intranet".equals(networkName)) {
                 // switch to intranet network
                 sb.setConfig(SwitchboardConstants.CORE_SERVICE_RWI, false);
-                sb.switchNetwork("defaults/yacy.network.intranet.unit");
+                sb.switchNetwork("/defaults/yacy.network.intranet.unit");
                 // switch to p2p mode: enable ad-hoc networks between intranet users
                 sb.setConfig(SwitchboardConstants.INDEX_DIST_ALLOW, false);
                 sb.setConfig(SwitchboardConstants.INDEX_RECEIVE_ALLOW, false);

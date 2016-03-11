@@ -43,6 +43,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -58,12 +59,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
+import org.mozilla.intl.chardet.nsDetector;
+import org.mozilla.intl.chardet.nsPSMDetector;
+
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.storage.Files;
 import net.yacy.cora.util.ConcurrentLog;
-
-import org.mozilla.intl.chardet.nsDetector;
-import org.mozilla.intl.chardet.nsPSMDetector;
 
 public final class FileUtils {
 
@@ -158,6 +159,23 @@ public final class FileUtils {
                 e);
         }
         return count;
+    }
+    
+    /**
+     * Copy source URL content to dest file
+     * @param source source url.
+     * @param dest destination file
+     * @throws IOException when an error occured
+     */
+    public static void copy(final URL source, final File dest) throws IOException {
+    	if(source == null) {
+    		throw new IOException("source url is null");
+    	}
+    	InputStream inStream = source.openStream();
+    	if(inStream == null) {
+    		throw new IOException("source url stream could not be open");
+    	}
+        copy(inStream, dest);
     }
 
     public static void copy(final InputStream source, final File dest) throws IOException {
@@ -376,41 +394,78 @@ public final class FileUtils {
         return source;
     }
 
-    public static HashSet<String> loadList(final File file) {
-        final HashSet<String> set = new HashSet<String>();
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-            String line;
-            while ( (line = br.readLine()) != null ) {
-                line = line.trim();
-                if ( line.length() > 0 && line.charAt(0) != '#' ) {
-                    set.add(line.trim().toLowerCase());
-                }
-            }
-            br.close();
-        } catch (final IOException e ) {
-        } finally {
-            if ( br != null ) {
-                try {
-                    br.close();
-                } catch (final Exception e ) {
-                }
-            }
-        }
-        return set;
-    }
+	/**
+	 * Load a list of properties from file
+	 * 
+	 * @param file
+	 *            containing properties
+	 * @return a set of properties eventually empty
+	 */
+	public static HashSet<String> loadList(final File file) {
+		HashSet<String> set = new HashSet<String>();
+		Reader reader;
+		try {
+			reader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8);
+			set = loadList(reader);
+		} catch (FileNotFoundException ignored) {
+		}
+		return set;
+	}
 
-    public static ConcurrentHashMap<String, String> loadMap(final File f) {
-        // load props
-        try {
-            final byte[] b = read(f);
-            return table(strings(b));
-        } catch (final IOException e2 ) {
-            ConcurrentLog.severe("FileUtils", f.toString() + " not found", e2);
-            return null;
-        }
-    }
+	/**
+	 * Load a list of properties from reader, then close reader.
+	 * 
+	 * @param reader
+	 *            for stream containing properties
+	 * @return a set of properties eventually empty
+	 */
+	public static HashSet<String> loadList(final Reader reader) {
+		final HashSet<String> set = new HashSet<String>();
+		BufferedReader br = null;
+		try {
+			br = new BufferedReader(reader);
+			String line;
+			while ((line = br.readLine()) != null) {
+				line = line.trim();
+				if (line.length() > 0 && line.charAt(0) != '#') {
+					set.add(line.trim().toLowerCase());
+				}
+			}
+		} catch (final IOException ignored) {
+		} finally {
+			if (br != null) {
+				try {
+					br.close();
+				} catch (final Exception ignored) {
+				}
+			}
+		}
+		return set;
+	}
+
+	public static ConcurrentHashMap<String, String> loadMap(final File f) {
+		// load props
+		try {
+			final byte[] b = read(f);
+			return table(strings(b));
+		} catch (final IOException e2) {
+			ConcurrentLog.severe("FileUtils", f.toString() + " not found", e2);
+			return null;
+		}
+	}
+
+	/**
+	 * Load a map of String keys/values from a stream reader.
+	 * 
+	 * @param r
+	 *            reader to a stream containing strings keys/values
+	 * @return a map eventually empty
+	 */
+	public static ConcurrentHashMap<String, String> loadMap(final Reader r) {
+		final BufferedReader br = new BufferedReader(r);
+		return table(new StringsIterator(br));
+	}
+
 
     public static ConcurrentHashMap<String, byte[]> loadMapB(final File f) {
         ConcurrentHashMap<String, String> m = loadMap(f);
@@ -522,35 +577,80 @@ public final class FileUtils {
         return new StringsIterator(new BufferedReader(new InputStreamReader(new ByteArrayInputStream(a), StandardCharsets.UTF_8)));
     }
 
-    /**
-     * Read lines of a file into an ArrayList.
-     *
-     * @param listFile the file
-     * @return the resulting array as an ArrayList
-     */
-    public static ArrayList<String> getListArray(final File listFile) {
-        String line;
-        final ArrayList<String> list = new ArrayList<String>();
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(listFile), StandardCharsets.UTF_8));
+	/**
+	 * Read lines of a file into an ArrayList.
+	 *
+	 * @param listFile the file
+	 * @return the resulting array as an ArrayList, empty when a read error occured or file could not be opened
+	 */
+	public static ArrayList<String> getListArray(final File listFile) {
+		ArrayList<String> list = new ArrayList<String>();
+		if (listFile != null) {
+			try {
+				InputStream inStream = new FileInputStream(listFile);
+				if (inStream != null) {
+					list = getListArray(inStream);
+				}
+			} catch (final FileNotFoundException e) {
+				ConcurrentLog.severe("FileUtils", "Could not open file : " + listFile);
+			} catch(SecurityException se) {
+				ConcurrentLog.severe("FileUtils", "Could not open file : " + listFile + " " + se.getMessage());
+			}
+		}
+		return list;
+	}
 
-            while ( (line = br.readLine()) != null ) {
-                list.add(line);
-            }
-            br.close();
-        } catch (final IOException e ) {
-            // list is empty
-        } finally {
-            if ( br != null ) {
-                try {
-                    br.close();
-                } catch (final Exception e ) {
-                }
-            }
-        }
-        return list;
-    }
+	/**
+	 * Read lines of a file into an ArrayList.
+	 *
+	 * @param listFile
+	 *            the file URL
+	 * @return the resulting array as an ArrayList, empty when a read error occured or file could not be opened
+	 */
+	public static ArrayList<String> getListArray(final URL listFile) {
+		ArrayList<String> list = new ArrayList<String>();
+		if (listFile != null) {
+			try {
+				InputStream inStream = listFile.openStream();
+				if (inStream != null) {
+					list = getListArray(inStream);
+				}
+			} catch (final IOException ioe) {
+				ConcurrentLog.severe("FileUtils", "Could not open url : " + listFile.getFile());
+			}
+		}
+		return list;
+	}
+
+	/**
+	 * Read lines of an input stream into an ArrayList.
+	 *
+	 * @param listFile
+	 *            the file URL
+	 * @return the resulting array as an ArrayList, empty when a read error occured or file could not be opened
+	 */
+	public static ArrayList<String> getListArray(final InputStream listStream) {
+		String line;
+		final ArrayList<String> list = new ArrayList<String>();
+		BufferedReader br = null;
+		try {
+			br = new BufferedReader(new InputStreamReader(listStream, StandardCharsets.UTF_8));
+
+			while ((line = br.readLine()) != null) {
+				list.add(line);
+			}
+		} catch (final IOException ioe) {
+			ConcurrentLog.logException(ioe);
+		} finally {
+			if (br != null) {
+				try {
+					br.close();
+				} catch (final Exception ignored) {
+				}
+			}
+		}
+		return list;
+	}
 
     /**
      * Write a String to a file (used for string representation of lists).

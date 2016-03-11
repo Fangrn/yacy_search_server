@@ -237,8 +237,18 @@ public class ResourceObserver {
         return this.sizeOfDirectory_lastCountValue;
     }
     
+    /**
+     * 
+     * @return usable space or 0L when path is not valid or security manager denies access to this information (RuntimePermission("getFileSystemAttributes"))
+     */
     public long getUsableSpace() {
-        return this.path.getUsableSpace();
+    	long space = 0L;
+    	try {
+    		this.path.getUsableSpace();
+    	} catch(SecurityException e) {
+    		log.warn("Security manager denies getting usable space");
+    	}
+        return space;
     }
     
     private Space getNormalizedDiskUsed(final boolean cached) {

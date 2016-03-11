@@ -137,7 +137,7 @@ public final class Fulltext {
             if (oldLocation.exists()) oldLocation.renameTo(solrLocation);
         }
         
-        EmbeddedInstance localCollectionInstance = new EmbeddedInstance(new File(new File(Switchboard.getSwitchboard().appPath, "defaults"), "solr"), solrLocation, CollectionSchema.CORE_NAME, new String[]{CollectionSchema.CORE_NAME, WebgraphSchema.CORE_NAME});
+        EmbeddedInstance localCollectionInstance = new EmbeddedInstance("/defaults/solr/", solrLocation, CollectionSchema.CORE_NAME, new String[]{CollectionSchema.CORE_NAME, WebgraphSchema.CORE_NAME});
         Version luceneVersion = localCollectionInstance.getDefaultCore().getSolrConfig().getLuceneVersion("luceneMatchVersion");
         String lvn = luceneVersion.major + "_" + luceneVersion.minor;
         ConcurrentLog.info("Fulltext", "using lucene version " + lvn);

@@ -72,6 +72,16 @@ public class PKCS12Tool {
         }    
     }
     
+    /**
+     * 
+     * @param jksName a jks file path to a writable file
+     * @param jksPassword
+     * @throws KeyStoreException
+     * @throws NoSuchAlgorithmException
+     * @throws CertificateException
+     * @throws IOException
+     * @throws UnrecoverableKeyException
+     */
     public void importToJKS(final String jksName, final String jksPassword) throws KeyStoreException, NoSuchAlgorithmException, CertificateException, IOException, UnrecoverableKeyException {
         // creating java keystore
         final KeyStore jks=KeyStore.getInstance("JKS");

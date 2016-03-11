@@ -25,8 +25,6 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
@@ -112,27 +110,17 @@ public class ConfigPortal {
             }
             if (post.containsKey("searchpage_default")) {
                 // load defaults from defaults/yacy.init file
-                final Properties config = new Properties();
-                final String mes = "ConfigPortal";
-                FileInputStream fis = null;
-                try {
-                    fis = new FileInputStream(new File(sb.appPath, "defaults/yacy.init"));
-                    config.load(fis);
-                } catch (final FileNotFoundException e) {
-                    ConcurrentLog.severe(mes, "could not find configuration file.");
-                    return prop;
-                } catch (final IOException e) {
-                    ConcurrentLog.severe(mes, "could not read configuration file.");
-                    return prop;
-                } finally {
-                    if (fis != null) {
-                        try {
-                            fis.close();
-                        } catch (final IOException e) {
-                            ConcurrentLog.logException(e);
-                        }
-                    }
-                }
+				final String mes = "ConfigPortal";
+				Properties config = null;
+				try {
+					config = sb.loadDefaultProperties("yacy.init");
+				} catch (FileNotFoundException notFound) {
+					ConcurrentLog.severe(mes, "could not find configuration file.");
+					return prop;
+				} catch (IOException io) {
+					ConcurrentLog.severe(mes, "could not read configuration file.");
+					return prop;
+				}
                 sb.setConfig(SwitchboardConstants.GREETING, config.getProperty(SwitchboardConstants.GREETING,"P2P Web Search"));
                 sb.setConfig(SwitchboardConstants.GREETING_HOMEPAGE, config.getProperty(SwitchboardConstants.GREETING_HOMEPAGE,"http://yacy.net"));
                 sb.setConfig(SwitchboardConstants.GREETING_LARGE_IMAGE, config.getProperty(SwitchboardConstants.GREETING_LARGE_IMAGE,"env/grafics/YaCyLogo_120ppi.png"));

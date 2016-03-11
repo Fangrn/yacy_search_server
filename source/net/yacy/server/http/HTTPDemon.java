@@ -28,13 +28,16 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
+
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.document.id.DigestURL;
 import net.yacy.cora.protocol.Domains;
@@ -198,11 +201,16 @@ public final class HTTPDemon {
             tp.put("date", systemDate);
 
             // rewrite the file
-            final File htRootPath = new File(switchboard.getAppPath(), switchboard.getConfig(SwitchboardConstants.HTROOT_PATH,SwitchboardConstants.HTROOT_PATH_DEFAULT));
+    		URL htrootURL = switchboard.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
+    				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+    		if(htrootURL == null) {
+    			throw new IOException("no htroot found");
+    		}
+    		URL htmlErrorURL = new URL(htrootURL, "proxymsg/error.html");
+    		InputStream htmlErrorStream = htmlErrorURL.openStream();
 
             TemplateEngine.writeTemplate(
-                    "/proxymsg/error.html",
-                    fis = new FileInputStream(new File(htRootPath, "/proxymsg/error.html")),
+                    "/proxymsg/error.html",htmlErrorStream,
                     o = new ByteArrayOutputStream(512),
                     tp
             );

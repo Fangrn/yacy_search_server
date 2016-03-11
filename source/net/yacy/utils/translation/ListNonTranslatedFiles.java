@@ -27,6 +27,7 @@ package net.yacy.utils.translation;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,8 +69,9 @@ public class ListNonTranslatedFiles extends TranslatorUtil {
 	 *            <li>args[1] : translation file path</li>
 	 *            <li>args[2] : extensions (separated by commas)</li>
 	 *            </ul>
+	 * @throws MalformedURLException when source dir path is not valid
 	 */
-	public static void main(String args[]) {
+	public static void main(String args[]) throws MalformedURLException {
 		File sourceDir = getSourceDir(args, 0);
 		Path sourcePath = sourceDir.toPath();
 
@@ -87,7 +89,7 @@ public class ListNonTranslatedFiles extends TranslatorUtil {
 				+ translationFile);
 
 		try {
-			Set<String> translatedRelativePaths = Translator.loadTranslationsLists(translationFile).keySet();
+			Set<String> translatedRelativePaths = Translator.loadTranslationsLists(translationFile.toURI().toURL()).keySet();
 
 			List<File> srcFiles = FileUtils.getFilesRecursive(sourceDir, excludedDir, fileFilter);
 			

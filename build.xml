@@ -135,12 +135,32 @@
     <filter token="REPL_PKGMANAGER" value="${PKGMANAGER}"/>
     <filter token="REPL_RESTARTCMD" value="${RESTARTCMD}"/>
 
-    <!-- apply replacments -->
+    <!-- apply replacements -->
     <delete file="${build}/net/yacy/peers/operation/yacyBuildProperties.java" failonerror="false"/>
     <copy file="${src}/net/yacy/peers/operation/yacyBuildProperties.java" tofile="${build}/net/yacy/peers/operation/yacyBuildProperties.java" overwrite="true" filtering="true" />
     
     <!-- copy log4j config file -->
     <copy file="${src}/log4j.properties" tofile="${build}/log4j.properties" overwrite="true" filtering="true" />
+  	
+    <!-- copy default configuration files to classes output dir -->
+    <copy todir="${build}/defaults">
+      <fileset dir="${defaults}"/>
+    </copy>
+  	
+    <!-- copy locales  -->
+    <copy todir="${build}/locales">
+      <fileset dir="${locales}"/>
+    </copy>
+
+    <!-- copy skins  -->
+    <copy todir="${build}/skins">
+      <fileset dir="${skins}"/>
+    </copy>
+
+    <!-- copy language statistics files -->
+    <copy todir="${build}/langdetect">
+      <fileset dir="${langdetect}"/>
+    </copy>
 
   </target>
 
@@ -227,8 +247,8 @@
     	<pathelement location="${lib}/lucene-queryparser-5.4.1.jar" />
     	<pathelement location="${lib}/lucene-spatial-5.4.1.jar" />
     	<pathelement location="${lib}/lucene-suggest-5.4.1.jar" />
-	<pathelement location="${lib}/jsonic-1.2.0.jar" />
-	<pathelement location="${lib}/langdetect.jar" />
+		<pathelement location="${lib}/jsonic-1.2.0.jar" />
+		<pathelement location="${lib}/langdetect.jar" />
     	<pathelement location="${lib}/metadata-extractor-2.8.1.jar" />
     	<pathelement location="${lib}/noggit-0.5.jar" />
     	<pathelement location="${lib}/org.restlet.jar" />
@@ -344,12 +364,6 @@
       </fileset>
     </copy>
 
-  	<!-- copy defaults -->
-    <copy todir="${release_main}/defaults">
-      <fileset dir="${defaults}" 
-               includes="**/*"/>
-    </copy>
-
   	<!-- copy Unix wrappers -->
     <copy todir="${release_main}">
       <fileset dir=".">
@@ -373,27 +387,6 @@
       	<include name="getWin32MaxHeap.bat"/>
         <include name="installYaCyWindowsService.bat" />
         <include name="uninstallYaCyWindowsService.bat" />
-      </fileset>
-    </copy>
-
-    <!-- copy locales  -->
-    <copy todir="${release_main}/locales">
-      <fileset dir="${locales}">
-        <include name="*"/>
-      </fileset>
-    </copy>
-
-    <!-- copy skins  -->
-    <copy todir="${release_main}/skins">
-      <fileset dir="${skins}">
-        <include name="*"/>
-      </fileset>
-    </copy>
-
-    <!-- copy language statistics files -->
-    <copy todir="${release_main}/langdetect">
-      <fileset dir="${langdetect}">
-        <include name="*"/>
       </fileset>
     </copy>
 
@@ -525,8 +518,7 @@
   <!-- make clean -->
   <target name="clean" description="make clean">
     <delete dir="${release_main}" failonerror="false"/>
-    <delete file="${build}/net/yacy/peers/operation/yacyBuildProperties.java" failonerror="false"/>
-    <delete file="${build}/log4j.properties" failonerror="false"/>
+  	<delete dir="${build}" failonerror="false"/>
     <delete file="${lib}/yacycore.jar" failonerror="false"/>
     <delete file="${lib}/yacy-cora.jar" failonerror="false"/>
     <delete file="${lib}/svnRevNr.jar" failonerror="false"/>
@@ -534,7 +526,6 @@
     <delete file="${libbuild}/GitRevTask.jar" failonerror="false"/>    
     <delete failonerror="false">
       <fileset dir="${src}" includes="**/*.class" />
-      <fileset dir="${build}" includes="**/*.class" />
       <fileset dir="${htroot}" includes="**/*.class" />
       <fileset dir="test/" includes="**/*.class" />
       <fileset dir="${libbuild}/svnRevNr" includes="**/*.class" />
@@ -558,11 +549,7 @@
       </fileset>
     </copy>
 
-  	<!-- copy defaults -->
-	<copy todir="${DESTDIR}/usr/share/yacy/defaults">
-  	    <fileset dir="${defaults}" includes="**/*"/>
-  	</copy>
-    
+   
     <!-- copy locales  -->
     <copy todir="${DESTDIR}/usr/share/yacy/locales">
       <fileset dir="${locales}">

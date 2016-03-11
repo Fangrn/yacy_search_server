@@ -411,6 +411,9 @@ public final class SwitchboardConstants {
     public static final String LIST_BLUE_DEFAULT        = null;
     public static final String LIST_BADWORDS_DEFAULT    = "yacy.badwords";
     public static final String LIST_STOPWORDS_DEFAULT   = "yacy.stopwords";
+    
+    /** Classpaht resource directory for defaults configuration resource files */
+    public static final String DEFAULTS_RESOURCES_DIR = "/defaults/";
 
     /**
      * <p><code>public static final String <strong>HTCACHE_PATH</strong> = "proxyCache"</code></p>
@@ -594,6 +597,9 @@ public final class SwitchboardConstants {
     /*
      * Skins
      */
+    /** Configuration key for skins path */
+    public static final String SKINS_PATH                  		   = "skinPath";
+    /** Default path for installed skins */
     public static final String SKINS_PATH_DEFAULT                  = "DATA/SKINS";
     
     /*

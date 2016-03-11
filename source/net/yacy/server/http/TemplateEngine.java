@@ -49,13 +49,14 @@ package net.yacy.server.http;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PushbackInputStream;
 import java.nio.charset.StandardCharsets;
+
+import org.eclipse.jetty.util.resource.Resource;
 
 import net.yacy.cora.document.encoding.ASCII;
 import net.yacy.cora.document.encoding.UTF8;
@@ -416,12 +417,21 @@ public final class TemplateEngine {
                         BufferedReader br = null;
                         try{
                             //br = new BufferedReader(new InputStreamReader(new FileInputStream( filename ))); //Simple Include
-                            br = new BufferedReader( new InputStreamReader(new FileInputStream( HTTPDFileHandler.getLocalizedFile(UTF8.String(filename))), StandardCharsets.UTF_8) ); //YaCy (with Locales)
-                            //Read the Include
-                            String line = "";
-                            while ((line = br.readLine()) != null) {
-                                include.append(UTF8.getBytes(line)).append(ASCII.getBytes(net.yacy.server.serverCore.CRLF_STRING));
-                            }
+							Resource localizedResource = HTTPDFileHandler.getLocalizedFile(UTF8.String(filename));
+							if (localizedResource == null) {
+								ConcurrentLog.severe("FILEHANDLER",
+										"Include Error with file " + UTF8.String(filename) + " : not found");
+							} else {
+								br = new BufferedReader(new InputStreamReader(localizedResource.getInputStream(),
+										StandardCharsets.UTF_8)); // YaCy (with
+																	// Locales)
+								// Read the Include
+								String line = "";
+								while ((line = br.readLine()) != null) {
+									include.append(UTF8.getBytes(line))
+											.append(ASCII.getBytes(net.yacy.server.serverCore.CRLF_STRING));
+								}
+							}
                         } catch (final IOException e) {
                             //file not found?
                             ConcurrentLog.severe("FILEHANDLER","Include Error with file " + UTF8.String(filename) + ": " + e.getMessage());

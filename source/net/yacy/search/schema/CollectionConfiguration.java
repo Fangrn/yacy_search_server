@@ -30,6 +30,7 @@ import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,6 +48,13 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
+import org.apache.solr.common.SolrException;
+import org.apache.solr.common.SolrInputDocument;
+import org.apache.solr.common.SolrInputField;
+import org.eclipse.jetty.util.ConcurrentHashSet;
 
 import net.yacy.cora.document.analysis.Classification;
 import net.yacy.cora.document.analysis.Classification.ContentDomain;
@@ -100,13 +108,6 @@ import net.yacy.search.index.Segment.ReferenceReport;
 import net.yacy.search.index.Segment.ReferenceReportCache;
 import net.yacy.search.query.QueryParams;
 
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrDocumentList;
-import org.apache.solr.common.SolrException;
-import org.apache.solr.common.SolrInputDocument;
-import org.apache.solr.common.SolrInputField;
-import org.eclipse.jetty.util.ConcurrentHashSet;
-
 
 public class CollectionConfiguration extends SchemaConfiguration implements Serializable {
 
@@ -128,6 +129,28 @@ public class CollectionConfiguration extends SchemaConfiguration implements Seri
         super(configurationFile);
         super.lazy = lazy;
         this.rankings = new ArrayList<Ranking>(4);
+        checkConsistency(configurationFile.getAbsolutePath());
+    }
+    
+    /**
+     * Initialize the schema with a given configuration URL.
+     * The configuration URL simply contains a list of lines with keywords
+     * or keyword = value lines (while value is a custom Solr field name
+     * @param configurationFile
+     * @throws IOException 
+     */
+    public CollectionConfiguration(final URL configURL, final boolean lazy) throws IOException {
+        super(configURL);
+        super.lazy = lazy;
+        this.rankings = new ArrayList<Ranking>(4);
+        checkConsistency(configURL.toString());
+    }
+    
+    /**
+     * Check consistency
+     * @param configPath path of config file
+     */
+    protected void checkConsistency(String configPath) {
         for (int i = 0; i <= 3; i++) rankings.add(new Ranking());
         // check consistency: compare with YaCyField enum
         if (this.isEmpty()) return;
@@ -137,7 +160,7 @@ public class CollectionConfiguration extends SchemaConfiguration implements Seri
                 CollectionSchema f = CollectionSchema.valueOf(etr.key());
                 f.setSolrFieldName(etr.getValue());
             } catch (final IllegalArgumentException e) {
-                ConcurrentLog.fine("SolrCollectionWriter", "solr schema file " + configurationFile.getAbsolutePath() + " defines unknown attribute '" + etr.toString() + "'");
+                ConcurrentLog.fine("SolrCollectionWriter", "solr schema file " + configPath + " defines unknown attribute '" + etr.toString() + "'");
                 it.remove();
             }
         }
@@ -147,9 +170,9 @@ public class CollectionConfiguration extends SchemaConfiguration implements Seri
         	    if (CollectionSchema.author_sxt.getSolrFieldName().endsWith(field.name())) continue; // exception for this: that is a copy-field
         	    if (CollectionSchema.coordinate_p_0_coordinate.getSolrFieldName().endsWith(field.name())) continue; // exception for this: automatically generated
         	    if (CollectionSchema.coordinate_p_1_coordinate.getSolrFieldName().endsWith(field.name())) continue; // exception for this: automatically generated
-                ConcurrentLog.warn("SolrCollectionWriter", " solr schema file " + configurationFile.getAbsolutePath() + " is missing declaration for '" + field.name() + "'");
+                ConcurrentLog.warn("SolrCollectionWriter", " solr schema file " + configPath + " is missing declaration for '" + field.name() + "'");
         	}
-        }
+        }    	
     }
 
     public String[] allFields() {

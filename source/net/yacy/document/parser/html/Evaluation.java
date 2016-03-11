@@ -25,8 +25,14 @@
 package net.yacy.document.parser.html;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.URL;
+import java.net.URLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +45,7 @@ import java.util.regex.PatternSyntaxException;
 import net.yacy.cora.sorting.ClusteredScoreMap;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.kelondro.util.MemoryControl;
+import net.yacy.kelondro.util.ResourceUtils;
 
 
 /*
@@ -105,11 +112,38 @@ public class Evaluation {
             if (this.modelName.length() < 1) throw new IOException("file name too short: " + name);
 
             // load the file
-            final Properties p = new Properties();
-            p.load(new FileReader(patternProperties));
+            this.elementMatcher = loadFile(new FileReader(patternProperties), name);
+        }
+
+        /**
+         * Load model from properties file URL.
+         * @param patternProperties patternProperties file URL. Must not be null.
+         * @throws IOException when a read exception occured
+         */
+        public Model(final URL patternProperties) throws IOException {
+            final String name = ResourceUtils.getFileName(patternProperties);
+            if (!name.startsWith("parser.")) throw new IOException("file name must start with 'parser.': " + name);
+            if (!name.endsWith(".properties")) throw new IOException("file name must end with '.properties': " + name);
+            this.modelName = name.substring(7, name.length() - 11);
+            if (this.modelName.length() < 1) throw new IOException("file name too short: " + name);
+
+            // load the file
+            this.elementMatcher = loadFile(new InputStreamReader(patternProperties.openStream(), StandardCharsets.UTF_8), name);
+        }
+
+		/**
+		 * Load pattern properties file and return map of element to attributes lists.
+		 * @param propertiesReader reader on properties file
+		 * @param name properties file name
+		 * @throws IOException when a read exception occurs
+		 */
+		protected HashMap<Element, List<Attribute>> loadFile(final Reader propertiesReader, final String name)
+				throws IOException, FileNotFoundException {
+            HashMap<Element, List<Attribute>> result = new HashMap<Element, List<Attribute>>();
+			final Properties p = new Properties();
+            p.load(propertiesReader);
 
             // iterate through the properties and generate method patterns
-            this.elementMatcher = new HashMap<Element, List<Attribute>>();
             String subject, elementName;
             Element element;
             Pattern pattern;
@@ -137,11 +171,12 @@ public class Evaluation {
                 List<Attribute> attributeList = this.elementMatcher.get(element);
                 if (attributeList == null) {
                     attributeList = new ArrayList<Attribute>();
-                    this.elementMatcher.put(element, attributeList);
+                    result.put(element, attributeList);
                 }
                 attributeList.add(new Attribute(subject, pattern));
             }
-        }
+            return result;
+		}
 
         public String getName() {
             return this.modelName;
@@ -208,6 +243,16 @@ public class Evaluation {
      */
     public static void add(final File f) throws IOException {
         final Model pattern = new Model(f);
+        models.add(pattern);
+    }
+    
+    /**
+     * add a model to the evaluation set
+     * @param modelURL mode properties file URL
+     * @throws IOException
+     */
+    public static void add(final URL modelURL) throws IOException {
+        final Model pattern = new Model(modelURL);
         models.add(pattern);
     }
 

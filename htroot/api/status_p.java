@@ -73,7 +73,8 @@ public class status_p {
         prop.putNum("totalMemory", MemoryControl.total());
         prop.putNum("maxMemory", MemoryControl.maxMemory());
         prop.putNum("usedDisk", sb.observer.getSizeOfDataPath(true));
-        prop.putNum("freeDisk", sb.observer.getUsableSpace());
+        long usableSpace = sb.observer.getUsableSpace();
+        prop.put("freeDisk", usableSpace < 1L ? "Unknown" : String.valueOf(usableSpace));
         prop.putNum("processors", WorkflowProcessor.availableCPU);
         prop.putNum("load", Memory.load());
         

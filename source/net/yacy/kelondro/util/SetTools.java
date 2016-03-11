@@ -26,10 +26,10 @@
 package net.yacy.kelondro.util;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -513,26 +513,41 @@ public final class SetTools {
         return map;
     }
 
-    public static SortedSet<String> loadList(final File file, final Comparator<String> c) {
-        final SortedSet<String> list = new TreeSet<String>(c);
-        if (!(file.exists())) return list;
+    /**
+     * Load list contained in reader stream and close reader.
+     * @param reader stream reader
+     * @param c comparator for entries
+     * @return a sorted set, eventually empty when reader is null.
+     */
+	public static SortedSet<String> loadList(final Reader reader, final Comparator<String> c) {
+		final SortedSet<String> list = new TreeSet<String>(c);
 
-        BufferedReader br = null;
-        try {
-            br = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
-            String line;
-            while ((line = br.readLine()) != null) {
-                int i = line.indexOf("|"); // ignore text after char (Solr stopwordfile syntax allows for # and | )
-                if (i>0) line = line.substring(0,i-1);
-                line = line.trim();
-                if (!line.isEmpty() && line.charAt(0) != '#') list.add(line.trim().toLowerCase());
-            }
-        } catch (final IOException e) {
-        } finally {
-            if (br != null) try{br.close();}catch(final Exception e){}
-        }
-        return list;
-    }
+		if (reader != null) {
+			BufferedReader br = null;
+			try {
+				br = new BufferedReader(reader);
+				String line;
+				while ((line = br.readLine()) != null) {
+					int i = line.indexOf("|"); // ignore text after char (Solr
+												// stopwordfile syntax allows
+												// for # and | )
+					if (i > 0)
+						line = line.substring(0, i - 1);
+					line = line.trim();
+					if (!line.isEmpty() && line.charAt(0) != '#')
+						list.add(line.trim().toLowerCase());
+				}
+			} catch (final IOException ignored) {
+			} finally {
+				if (br != null)
+					try {
+						br.close();
+					} catch (final Exception e) {
+					}
+			}
+		}
+		return list;
+	}
 
     public static String setToString(final HandleSet set, final char separator) {
         final Iterator<byte[]> i = set.iterator();

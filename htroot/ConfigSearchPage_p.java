@@ -25,12 +25,11 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.Date;
 import java.util.Properties;
+
 import net.yacy.cora.date.GenericFormatter;
 import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.cora.util.ConcurrentLog;
@@ -96,27 +95,17 @@ public class ConfigSearchPage_p {
             }
             if (post.containsKey("searchpage_default")) {
                 // load defaults from defaults/yacy.init file
-                final Properties config = new Properties();
-                final String mes = "ConfigSearchPage_p";
-                FileInputStream fis = null;
-                try {
-                    fis = new FileInputStream(new File(sb.appPath, "defaults/yacy.init"));
-                    config.load(fis);
-                } catch (final FileNotFoundException e) {
-                    ConcurrentLog.severe(mes, "could not find configuration file.");
-                    return prop;
-                } catch (final IOException e) {
-                    ConcurrentLog.severe(mes, "could not read configuration file.");
-                    return prop;
-                } finally {
-                    if (fis != null) {
-                        try {
-                            fis.close();
-                        } catch (final IOException e) {
-                            ConcurrentLog.logException(e);
-                        }
-                    }
-                }
+				final String mes = "ConfigSearchPage_p";
+				Properties config = null;
+				try {
+					config = sb.loadDefaultProperties("yacy.init");
+				} catch (FileNotFoundException notFound) {
+					ConcurrentLog.severe(mes, "could not find configuration file.");
+					return prop;
+				} catch (IOException io) {
+					ConcurrentLog.severe(mes, "could not read configuration file.");
+					return prop;
+				}
                 sb.setConfig("publicTopmenu", config.getProperty("publicTopmenu","true"));
                 sb.setConfig("search.navigation", config.getProperty("search.navigation","hosts,authors,namespace,topics"));
                 sb.setConfig("search.options", config.getProperty("search.options","true"));

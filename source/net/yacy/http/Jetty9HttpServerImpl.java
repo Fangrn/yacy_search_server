@@ -25,17 +25,17 @@
 package net.yacy.http;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.security.KeyStore;
 import java.util.StringTokenizer;
+
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import net.yacy.cora.util.ConcurrentLog;
-import net.yacy.http.servlets.YaCyDefaultServlet;
-import net.yacy.search.Switchboard;
-import net.yacy.search.SwitchboardConstants;
-import net.yacy.utils.PKCS12Tool;
+
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Handler;
@@ -51,9 +51,16 @@ import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.server.handler.IPAccessHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.webapp.WebAppContext;
+
+import net.yacy.cora.util.ConcurrentLog;
+import net.yacy.http.servlets.YaCyDefaultServlet;
+import net.yacy.search.Switchboard;
+import net.yacy.search.SwitchboardConstants;
+import net.yacy.utils.PKCS12Tool;
 
 /**
  * class to embedded Jetty 9 http server into YaCy
@@ -109,16 +116,21 @@ public class Jetty9HttpServerImpl implements YaCyHttpServer {
         // configure root context
         WebAppContext htrootContext = new WebAppContext();
         htrootContext.setContextPath("/");
-        String htrootpath = sb.getConfig(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT);
         htrootContext.setErrorHandler(new YaCyErrorHandler()); // handler for custom error page
         try {
-            htrootContext.setBaseResource(Resource.newResource(htrootpath));
+    		URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
+    				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+       		Resource resourceBase = Resource.newResource(htrootURL);	
+        	if(resourceBase == null || !resourceBase.exists() || !resourceBase.isDirectory()) {
+                ConcurrentLog.severe("SERVER", "could not find directory: htroot ");
+        	}
+            htrootContext.setBaseResource(resourceBase);
 
             // set web.xml to use
             // make use of Jetty feature to define web.xml other as default WEB-INF/web.xml
             // and to use a DefaultsDescriptor merged with a individual web.xml
             // use defaults/web.xml as default and look in DATA/SETTINGS for local addition/changes
-            htrootContext.setDefaultsDescriptor(sb.appPath + "/defaults/web.xml");
+            htrootContext.setDefaultsDescriptor("/defaults/web.xml");
             Resource webxml = Resource.newResource(sb.dataPath + "/DATA/SETTINGS/web.xml");
             if (webxml.exists()) {
                 htrootContext.setDescriptor(webxml.getName());
@@ -128,13 +140,12 @@ public class Jetty9HttpServerImpl implements YaCyHttpServer {
             if (htrootContext.getBaseResource() == null) {
                 ConcurrentLog.severe("SERVER", "could not find directory: htroot ");
             } else {
-                ConcurrentLog.warn("SERVER", "could not find: defaults/web.xml or DATA/SETTINGS/web.xml");
+                ConcurrentLog.warn("SERVER", "could not find: /defaults/web.xml or DATA/SETTINGS/web.xml");
             }
         }
 
         // as fundamental component leave this hardcoded, other servlets may be defined in web.xml only
         ServletHolder sholder = new ServletHolder(YaCyDefaultServlet.class);
-        sholder.setInitParameter("resourceBase", htrootpath);
         sholder.setAsyncSupported(true); // needed for YaCyQoSFilter
         //sholder.setInitParameter("welcomeFile", "index.html"); // default is index.html, welcome.html
         htrootContext.addServlet(sholder, "/*");
@@ -375,7 +386,7 @@ public class Jetty9HttpServerImpl implements YaCyHttpServer {
         
         // if no keyStore and no import is defined, then set the default key
         if (keyStoreFileName.isEmpty() && keyStorePwd.isEmpty() && pkcs12ImportFile.isEmpty()) {
-            keyStoreFileName = "defaults/freeworldKeystore";
+            keyStoreFileName = "/defaults/freeworldKeystore";
             keyStorePwd = "freeworld";
             sb.setConfig("keyStore", keyStoreFileName);
             sb.setConfig("keyStorePassword", keyStorePwd);
@@ -433,9 +444,21 @@ public class Jetty9HttpServerImpl implements YaCyHttpServer {
  
             // loading keystore data from file
             if (ConcurrentLog.isFine("SERVER")) ConcurrentLog.fine("SERVER","Loading keystore file " + keyStoreFileName);
-            final FileInputStream stream = new FileInputStream(keyStoreFileName);
-            ks.load(stream, keyStorePwd.toCharArray());
-            stream.close();
+            
+            /* keyStoreFileName may be a regular file or a resource name ("/defaults/freeworldKeystore") */
+            InputStream keyStoreStream = null;
+            
+            try {
+            	keyStoreStream = new FileInputStream(keyStoreFileName);
+            } catch(FileNotFoundException e) {
+            	keyStoreStream = this.getClass().getResourceAsStream(keyStoreFileName);
+            }
+            ks.load(keyStoreStream, keyStorePwd.toCharArray());
+            try {
+            	keyStoreStream.close();
+            } catch(IOException ignored) {
+            	ConcurrentLog.logException(ignored);
+            }
  
             // creating a keystore factory
             if (ConcurrentLog.isFine("SERVER")) ConcurrentLog.fine("SERVER","Initializing key manager factory ...");

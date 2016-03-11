@@ -25,6 +25,13 @@
 //if the shell's current path is HTROOT
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -50,7 +57,7 @@ public class PerformanceQueues_p {
         // return variable that accumulates replacements
         final Switchboard sb = (Switchboard) env;
         final serverObjects prop = new serverObjects();
-        File defaultSettingsFile = new File(sb.getAppPath(), "defaults/yacy.init");
+        Reader defaultSettingsReader = null;
 
         // get segment
         Segment indexSegment = sb.index;
@@ -58,11 +65,17 @@ public class PerformanceQueues_p {
         if(post != null) {
         	if(post.containsKey("defaultFile")){
 	            // TODO check file-path!
-	            final File value = new File(sb.getAppPath(), post.get("defaultFile", "defaults/yacy.init"));
-	            // check if value is readable file
-	            if(value.exists() && value.isFile() && value.canRead()) {
-	                defaultSettingsFile = value;
-	            }
+        		String fileName = post.get("defaultFile", "");
+        		if(!fileName.isEmpty()) {
+        			final File value = new File(sb.getAppPath(), fileName);
+        			// check if value is readable file
+        			if(value.exists() && value.isFile() && value.canRead()) {
+        				try {
+							defaultSettingsReader = new FileReader(value);
+						} catch (FileNotFoundException ignored) {
+						}
+        			}
+        		}
         	}
             if (post.containsKey("Xmx")) {
                 int xmx = post.getInt("Xmx", 600); // default maximum heap size
@@ -85,7 +98,16 @@ public class PerformanceQueues_p {
             	MemoryControl.resetProperState();
             }
         }
-        final Map<String, String> defaultSettings = ((post == null) || (!(post.containsKey("submitdefault")))) ? null : FileUtils.loadMap(defaultSettingsFile);
+        Map<String, String> defaultSettings = new HashMap<String, String>();
+        if(post != null && post.containsKey("submitdefault")) {
+            if(defaultSettingsReader == null) {
+            	InputStream defaultSettingsStream = PerformanceQueues_p.class.getResourceAsStream("/defaults/yacy.init");
+            	if(defaultSettingsStream != null) {
+            		defaultSettingsReader = new InputStreamReader(defaultSettingsStream, StandardCharsets.UTF_8);
+            		defaultSettings = FileUtils.loadMap(defaultSettingsReader);
+            	}
+            }
+        }
         Iterator<String> threads = sb.threadNames();
         String threadName;
         BusyThread thread;

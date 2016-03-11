@@ -27,19 +27,17 @@
 
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.Iterator;
 
+import net.yacy.cora.federate.FederateSearchManager;
+import net.yacy.cora.federate.solr.SchemaConfiguration;
 import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.cora.storage.Configuration;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.data.WorkTables;
 import net.yacy.search.Switchboard;
-
-import java.io.IOException;
-import java.util.Iterator;
-import net.yacy.cora.federate.FederateSearchManager;
-
-import net.yacy.cora.federate.solr.SchemaConfiguration;
-import net.yacy.cora.storage.Files;
 import net.yacy.search.SwitchboardConstants;
 import net.yacy.search.schema.WebgraphSchema;
 import net.yacy.server.serverObjects;
@@ -137,16 +135,12 @@ public class ConfigHeuristics_p {
             // copy default opensearch heuristic config with sample entries
             if (post.containsKey("copydefaultosdconfig") || post.containsKey("resettodefaultosdlist")) {
                 // prepare a solr index profile switch list
-                final File osdDefaultConfig = new File(sb.getAppPath(), "defaults/heuristicopensearch.conf");
+                final URL osdDefaultConfig = sb.getClass().getResource("/defaults/heuristicopensearch.conf");
                 final File osdConfig = new File(sb.getDataPath(), "DATA/SETTINGS/heuristicopensearch.conf");
-                if ((post.containsKey("resettodefaultosdlist") || !osdConfig.exists()) && osdDefaultConfig.exists()) {
-                    try {
-                        Files.copy(osdDefaultConfig, osdConfig);
-                        File defdir = new File(sb.dataPath, "DATA/SETTINGS/federatecfg");
-                        if (!defdir.exists()) {
-                            Files.copy(new File(sb.appPath, "defaults/federatecfg"), defdir);
-                        }
-                    } catch (final IOException ex) {
+                if ((post.containsKey("resettodefaultosdlist") || !osdConfig.exists() && osdDefaultConfig != null)) {
+                	boolean copyOK = sb.copyDefaultsConfigIfNotExists(sb.getDataPath(), "heuristicopensearch.conf");
+                	copyOK = copyOK && sb.copyDefaultsConfigDirIfNotExists(sb.getDataPath(), "federatecfg");
+                    if(!copyOK) {
                         osderrmsg = "file I/O error during copy";
                     }
                 } else {osderrmsg = "config file exists or default doesn't exist";}

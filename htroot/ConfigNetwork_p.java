@@ -25,9 +25,12 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.Set;
 
 import net.yacy.cora.document.encoding.ASCII;
@@ -54,9 +57,14 @@ public class ConfigNetwork_p
         int commit = 0;
 
         // load all options for network definitions
-        final File networkBootstrapLocationsFile =
-            new File(new File(sb.getAppPath(), "defaults"), "yacy.networks");
-        final Set<String> networkBootstrapLocations = FileUtils.loadList(networkBootstrapLocationsFile);
+        InputStream networksLocationsStream = ConfigNetwork_p.class.getResourceAsStream("/defaults/yacy.networks");
+        final Set<String> networkBootstrapLocations;
+        if(networksLocationsStream != null) {
+        	networkBootstrapLocations = FileUtils.loadList(new InputStreamReader(networksLocationsStream, StandardCharsets.UTF_8));
+        } else {
+        	networkBootstrapLocations = new HashSet<>();
+        }
+        
 
         if ( post != null ) {
 
@@ -68,7 +76,7 @@ public class ConfigNetwork_p
                 "network settings");
 
             if ( post.containsKey("changeNetwork") ) {
-                String networkDefinition = post.get("networkDefinition", "defaults/yacy.network.freeworld.unit");
+                String networkDefinition = post.get("networkDefinition", "/defaults/yacy.network.freeworld.unit");
                 final String networkDefinitionURL = post.get("networkDefinitionURL", "");
                 if ( !networkDefinitionURL.equals("")) {
                 	networkDefinition = networkDefinitionURL;

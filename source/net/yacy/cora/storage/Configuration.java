@@ -26,13 +26,16 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.io.Serializable;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 
 import net.yacy.cora.storage.Configuration.Entry;
-import net.yacy.cora.storage.Files;
 
 /**
  * this class reads configuration attributes as a list of keywords from a list
@@ -60,11 +63,35 @@ public class Configuration extends TreeMap<String, Entry> implements Serializabl
         this.lazy = false;
     }
 
+    /**
+     * Create an instance filled with file entries
+     * @param file configuration file. Must not be null.
+     * @throws IOException when an error occured
+     */
     public Configuration(final File file) throws IOException {
         this.file = file;
+        init(new FileReader(file));
+    }
+    
+    /**
+     * Create a readOnly (later calls to commit will do nothing) instance filled with entries from URL
+     * @param configURL configuration url. Must not be null.
+     * @throws IOException when an error occured
+     */
+    public Configuration(URL configURL) throws IOException {
+        this.file = null;
+        init(new InputStreamReader(configURL.openStream(), StandardCharsets.UTF_8));
+    }
+    
+    /**
+     * Initialize this instance with entries from reader. Closes reader once finished.
+     * @param reader must not be null.
+     * @throws IOException when an error occured.
+     */
+    protected void init(Reader reader) throws IOException {
         BufferedReader br = null;
         try {
-            br = new BufferedReader(new FileReader(this.file));
+            br = new BufferedReader(reader);
             String s;
             boolean enabled;
             String comment, key, value;

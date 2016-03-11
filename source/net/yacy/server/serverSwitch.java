@@ -31,6 +31,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -75,7 +78,7 @@ public class serverSwitch {
 	private boolean isConnectedViaUpnp;
 
 	public serverSwitch(final File dataPath, final File appPath,
-			final String initPath, final String configPath) {
+			final URL initURL, final String configPath) {
 		// we initialize the switchboard with a property file,
 		// but maintain these properties then later in a new 'config' file
 		// to reset all changed configs, the config file must
@@ -84,22 +87,17 @@ public class serverSwitch {
 		// file name of the config file
 		this.dataPath = dataPath;
 		this.appPath = appPath;
-		this.configComment = "This is an automatically generated file, updated by serverAbstractSwitch and initialized by "
-				+ initPath;
-		final File initFile = new File(appPath, initPath);
+		final ConcurrentMap<String, String> initProps = parseInitProps(initURL);
+		String comment = "This is an automatically generated file, updated by serverAbstractSwitch";
+		if(!initProps.isEmpty() && initURL != null) {
+			comment += " and initialized by " + initURL.getFile();
+		}
+		this.configComment = comment;
 		this.configFile = new File(dataPath, configPath); // propertiesFile(config);
 		this.firstInit = !this.configFile.exists(); // this is true if the
 													// application was started
 													// for the first time
 		new File(this.configFile.getParent()).mkdir();
-
-		// predefine init's
-		final ConcurrentMap<String, String> initProps;
-		if (initFile.exists()) {
-			initProps = FileUtils.loadMap(initFile);
-		} else {
-			initProps = new ConcurrentHashMap<String, String>();
-		}
 
 		// load config's from last save
 		if (this.configFile.exists()) {
@@ -142,6 +140,35 @@ public class serverSwitch {
 				getConfigLong("server.maxTrackingTime", 60 * 60 * 1000),
 				(int) getConfigLong("server.maxTrackingCount", 1000),
 				(int) getConfigLong("server.maxTrackingHostCount", 100));
+	}
+
+	/**
+	 * Try to parse initURL file and return it as a map of proprerties
+	 * @param initURL properties file URL 
+	 * @return init properties, eventually empty
+	 */
+	private ConcurrentMap<String, String> parseInitProps(final URL initURL) {
+		ConcurrentMap<String, String> initProps;
+		if(initURL != null) {
+			Reader initReader = null;
+			try {
+				initReader = new InputStreamReader(initURL.openStream(), StandardCharsets.UTF_8);
+				initProps = FileUtils.loadMap(initReader);
+			} catch (IOException e) {
+				initProps = new ConcurrentHashMap<String, String>();
+				ConcurrentLog.logException(e);
+			} finally {
+				if(initReader != null) {
+					try {
+						initReader.close();
+					} catch (IOException ignored) {
+					}
+				}
+			}
+		} else {
+			initProps = new ConcurrentHashMap<String, String>();
+		}
+		return initProps;
 	}
 
 	/**
@@ -467,6 +494,64 @@ public class serverSwitch {
 		return (f.isAbsolute() ? new File(f.getAbsolutePath()) : new File(
 				prefix, path));
 	}
+	
+	/**
+	 * Looks for file or directory configured with key value : a relative path to app path,
+	 * or an absolute path. If key has no value or configured path is not an
+	 * existing path, looks for a classpath defaultResource.
+	 * 
+	 * @param key configuration key
+	 * @param defaultResource classpath resource path
+	 * @return a file resource, eventually null if not found
+	 */
+	public URL getAppFileOrDefaultResource(final String key, final String defaultResource) {
+		return getFileOrDefaultResource(key, defaultResource, this.appPath);
+	}
+	
+	/**
+	 * Looks for file or directory configured with key value : a relative path to data path,
+	 * or an absolute path. If key has no value or configured path is not an
+	 * existing path, looks for a classpath defaultResource.
+	 * 
+	 * @param key configuration key
+	 * @param defaultResource classpath resource path
+	 * @return a file resource, eventually null if not found
+	 */
+	public URL getDataFileOrDefaultResource(final String key, final String defaultResource) {
+		return getFileOrDefaultResource(key, defaultResource, this.dataPath);
+	}
+	
+	/**
+	 * Looks for file or directory configured with key value : a relative path to parentDir,
+	 * or an absolute path. If key has no value or configured path is not an
+	 * existing path, looks for a classpath defaultResource.
+	 * 
+	 * @param key configuration key
+	 * @param defaultResource classpath resource path
+	 * @param parentDir parent dir for configured file. Must not be null.
+	 * @return a file resource, eventually null if not found
+	 */
+	public URL getFileOrDefaultResource(final String key, final String defaultResource, File parentDir) {
+		final String path = getConfig(key, "").replace('\\', '/');
+		URL resource = null;
+		if (!path.isEmpty()) {
+			File f = new File(path);
+			if(!f.isAbsolute()) {
+				f = new File(parentDir, path);
+			}
+			if (f.exists()) {
+				try {
+					resource = f.getAbsoluteFile().toURI().toURL();
+				} catch (MalformedURLException e) {
+					ConcurrentLog.warn("serverSwitch", "malformed path : " + f.getAbsolutePath());
+				}
+			}
+		}
+		if (resource == null) {
+			resource = this.getClass().getResource(defaultResource);
+		}
+		return resource;
+	}
 
 	public Iterator<String> configKeys() {
 		return this.configProps.keySet().iterator();
@@ -634,7 +719,7 @@ public class serverSwitch {
 	}
 
 	/**
-	 * Retrieve text data (e. g. config file) from file file may be an url or a
+	 * Retrieve text data (e. g. config file) from file. File may be an http url, a classpath resource or a
 	 * filename with path relative to rootPath parameter
 	 * 
 	 * @param file
@@ -643,6 +728,7 @@ public class serverSwitch {
 	 *            searchpath for file
 	 * @param file
 	 *            file to use when remote fetching fails (null if unused)
+	 * @return a reader open on config file
 	 */
 	public Reader getConfigFileFromWebOrLocally(final String uri,
 			final String rootPath, final File file) throws IOException,
@@ -688,6 +774,17 @@ public class serverSwitch {
 			}
 			throw new FileNotFoundException();
 		}
+		/* try as classpath resource */
+		//TODO pour test
+		ConcurrentLog.info("getConfigFileFromWebOrLocally", "loading resource : " + uri);
+		URL resource = this.getClass().getResource(uri);
+		if(resource != null) {
+			try {
+				return new InputStreamReader(resource.openStream(), StandardCharsets.UTF_8);
+			} catch(IOException ignored) {}
+		}
+		
+		/* try file relative to rootPath */
 		final File f = (uri.length() > 0 && uri.startsWith("/")) ? new File(uri)
 				: new File(rootPath, uri);
 		if (f.exists())

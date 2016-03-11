@@ -26,6 +26,7 @@
 package net.yacy.utils.translation;
 
 import java.io.File;
+import java.net.MalformedURLException;
 
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.data.Translator;
@@ -51,8 +52,9 @@ public class TranslateAllToOneLanguage extends TranslatorUtil {
 	 *            <li>args[2] : locale file path</li>
 	 *            <li>args[3] : extensions (separated by commas)</li>
 	 *            </ul>
+	 * @throws MalformedURLException when local file path is not valid
 	 */
-	public static void main(String args[]) {
+	public static void main(String args[]) throws MalformedURLException {
 		File sourceDir = getSourceDir(args,0);
 
 		File destDir = getDestDir(args);
@@ -66,8 +68,8 @@ public class TranslateAllToOneLanguage extends TranslatorUtil {
 				+ translationFile);
 
 		try {
-			Translator.translateFilesRecursive(sourceDir, destDir,
-					translationFile, extensions, "locale");
+			Translator.translateFilesRecursive(sourceDir.getAbsoluteFile().toURI().toURL(), destDir,
+					translationFile.toURI().toURL(), extensions, "locale");
 		} finally {
 			ConcurrentLog.shutdown();
 		}

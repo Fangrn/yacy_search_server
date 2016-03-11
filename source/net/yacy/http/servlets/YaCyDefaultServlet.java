@@ -24,7 +24,6 @@ import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -59,6 +58,23 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileItemFactory;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.eclipse.jetty.http.HttpHeader;
+import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.MimeTypes;
+import org.eclipse.jetty.io.WriterOutputStream;
+import org.eclipse.jetty.server.InclusiveByteRange;
+import org.eclipse.jetty.util.MultiPartOutputStream;
+import org.eclipse.jetty.util.URIUtil;
+import org.eclipse.jetty.util.resource.Resource;
+
+import com.google.common.util.concurrent.SimpleTimeLimiter;
+import com.google.common.util.concurrent.TimeLimiter;
+import com.google.common.util.concurrent.UncheckedTimeoutException;
+
 import net.yacy.cora.date.GenericFormatter;
 import net.yacy.cora.document.analysis.Classification;
 import net.yacy.cora.order.Base64Order;
@@ -76,31 +92,13 @@ import net.yacy.peers.graphics.EncodedImage;
 import net.yacy.peers.operation.yacyBuildProperties;
 import net.yacy.search.Switchboard;
 import net.yacy.search.SwitchboardConstants;
-import net.yacy.server.http.HTTPDFileHandler;
-import net.yacy.server.http.TemplateEngine;
 import net.yacy.server.serverClassLoader;
 import net.yacy.server.serverObjects;
 import net.yacy.server.serverSwitch;
 import net.yacy.server.servletProperties;
+import net.yacy.server.http.HTTPDFileHandler;
+import net.yacy.server.http.TemplateEngine;
 import net.yacy.visualization.RasterPlotter;
-
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.FileItemFactory;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-
-import org.eclipse.jetty.http.HttpHeader;
-import org.eclipse.jetty.http.HttpMethod;
-import org.eclipse.jetty.http.MimeTypes;
-import org.eclipse.jetty.io.WriterOutputStream;
-import org.eclipse.jetty.server.InclusiveByteRange;
-import org.eclipse.jetty.util.MultiPartOutputStream;
-import org.eclipse.jetty.util.URIUtil;
-import org.eclipse.jetty.util.resource.Resource;
-
-import com.google.common.util.concurrent.SimpleTimeLimiter;
-import com.google.common.util.concurrent.TimeLimiter;
-import com.google.common.util.concurrent.UncheckedTimeoutException;
 
 /**
  * YaCyDefaultServlet based on Jetty DefaultServlet.java 
@@ -144,8 +142,8 @@ public class YaCyDefaultServlet extends HttpServlet  {
     
     protected File _htLocalePath;
     protected File _htDocsPath;    
-    protected static final serverClassLoader provider = new serverClassLoader(/*this.getClass().getClassLoader()*/);
-    protected ConcurrentHashMap<File, SoftReference<Method>> templateMethodCache = null;
+    protected serverClassLoader provider;
+    protected ConcurrentHashMap<Resource, SoftReference<Method>> templateMethodCache = null;
     // settings for multipart/form-data
     protected static final File TMPDIR = new File(System.getProperty("java.io.tmpdir"));
     protected static final int SIZE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100 MB is a lot but appropriate for multi-document pushed using the push_p.json servlet
@@ -178,17 +176,25 @@ public class YaCyDefaultServlet extends HttpServlet  {
             if (rb != null) {
                 _resourceBase = Resource.newResource(rb);
             } else {
-                _resourceBase = Resource.newResource(sb.getConfig(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT)); //default
+        		URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
+        				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+        		_resourceBase = Resource.newResource(htrootURL);
             }
         } catch (IOException e) {
             ConcurrentLog.severe("FILEHANDLER", "YaCyDefaultServlet: resource base (htRootPath) missing");
             ConcurrentLog.logException(e);
             throw new UnavailableException(e.toString());
         }
+        /* Resource.newResource may also return null*/
+        if(_resourceBase == null || ! _resourceBase.exists() || !_resourceBase.isDirectory()) {
+            ConcurrentLog.severe("FILEHANDLER", "YaCyDefaultServlet: resource base (htRootPath) missing");
+            throw new UnavailableException("YaCyDefaultServlet: resource base (htRootPath) missing");
+        }
         if (ConcurrentLog.isFine("FILEHANDLER")) {
             ConcurrentLog.fine("FILEHANDLER","YaCyDefaultServlet: resource base = " + _resourceBase);
         }
-        templateMethodCache = new ConcurrentHashMap<File, SoftReference<Method>>();
+        provider = new serverClassLoader(this._resourceBase);
+        templateMethodCache = new ConcurrentHashMap<Resource, SoftReference<Method>>();
     }
 
 
@@ -659,7 +665,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
     }
 
     
-    protected Object invokeServlet(final File targetClass, final RequestHeader request, final serverObjects args) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+    protected Object invokeServlet(final Resource targetClass, final RequestHeader request, final serverObjects args) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
         return rewriteMethod(targetClass).invoke(null, new Object[]{request, args, Switchboard.getSwitchboard()}); // add switchboard
     }
 
@@ -698,61 +704,66 @@ public class YaCyDefaultServlet extends HttpServlet  {
     }
 
     /**
-     * Returns a path to the localized or default file according to the
+     * Returns a localized or default resource according to the
      * parameter localeSelection
      *
      * @param path relative from htroot
      * @param localeSelection language of localized file; locale.language from
      * switchboard is used if localeSelection.equals("")
+     * @return resource file
      */
-    public File getLocalizedFile(final String path, final String localeSelection) throws IOException {
+    public Resource getLocalizedResource(final String path, final String localeSelection) throws IOException {
         if (!(localeSelection.equals("default"))) {
             final File localePath = new File(_htLocalePath, localeSelection + '/' + path);
             if (localePath.exists()) {
-                return localePath;  // avoid "NoSuchFile" troubles if the "localeSelection" is misspelled
+                return Resource.newResource(localePath);  // avoid "NoSuchFile" troubles if the "localeSelection" is misspelled
             }
         }
 
         File docsPath = new File(_htDocsPath, path);
         if (docsPath.exists()) {
-            return docsPath;
+            return Resource.newResource(docsPath);
         }
-        return _resourceBase.addPath(path).getFile();
+        return _resourceBase.addPath(path);
     }
 
-    protected File rewriteClassFile(final File template) {
-        try {
-            String f = template.getCanonicalPath();
-            final int p = f.lastIndexOf('.');
-            if (p < 0) {
-                return null;
-            }
-            f = f.substring(0, p) + ".class";
-            final File cf = new File(f);
-            if (cf.exists()) {
-                return cf;
-            }
-            return null;
-        } catch (final IOException e) {
-            return null;
-        }
-    }
+	/**
+	 * @param template
+	 *            template file name.
+	 * @return resource class name corresponding to template or null when
+	 *         template has no extension.
+	 */
+	protected String templateToClass(final String template) {
+		String className = null;
+		if (template != null) {
+			final int p = template.lastIndexOf('.');
+			if (p >= 0) {
+				className = template.substring(0, p) + ".class";
+			}
+		}
+		return className;
+	}
 
-    protected Method rewriteMethod(final File classFile) throws InvocationTargetException {
-        Method m = null;
+	/**
+	 * @param classResource class file to load. Class is supposed to have a "respond(RequestHeader, serverObjects, serverSwitch)" method
+	 * @return class "respond" method
+	 * @throws InvocationTargetException when class doesn't exists or doesn't have a "respond" method
+	 */
+    protected Method rewriteMethod(final Resource classResource) throws InvocationTargetException {
+        Method m;
         // now make a class out of the stream
         try {
-            final SoftReference<Method> ref = templateMethodCache.get(classFile);
+            final SoftReference<Method> ref = templateMethodCache.get(classResource);
             if (ref != null) {
                 m = ref.get();
                 if (m == null) {
-                    templateMethodCache.remove(classFile);
+                    templateMethodCache.remove(classResource);
                 } else {
                     return m;
                 }
             }
 
-            final Class<?> c = provider.loadClass(classFile);
+            final Class<?> c = provider.loadClassResource(classResource);
             
             final Class<?>[] params = (Class<?>[]) Array.newInstance(Class.class, 3);
             params[0]=  RequestHeader.class;
@@ -764,14 +775,14 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 templateMethodCache.clear();
             } else {
                 // store the method into the cache
-                templateMethodCache.put(classFile, new SoftReference<Method>(m));
+                templateMethodCache.put(classResource, new SoftReference<Method>(m));
             }
         } catch (final ClassNotFoundException e) {
-            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: class " + classFile + " is missing:" + e.getMessage());
-            throw new InvocationTargetException(e, "class " + classFile + " is missing:" + e.getMessage());
+            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: class " + classResource + " is missing:" + e.getMessage());
+            throw new InvocationTargetException(e, "class " + classResource + " is missing:" + e.getMessage());
         } catch (final NoSuchMethodException e) {
-            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: method 'respond' not found in class " + classFile + ": " + e.getMessage());
-            throw new InvocationTargetException(e, "method 'respond' not found in class " + classFile + ": " + e.getMessage());
+            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: method 'respond' not found in class " + classResource + ": " + e.getMessage());
+            throw new InvocationTargetException(e, "method 'respond' not found in class " + classResource + ": " + e.getMessage());
         }
         return m;
     }
@@ -780,8 +791,12 @@ public class YaCyDefaultServlet extends HttpServlet  {
         Switchboard sb = Switchboard.getSwitchboard();
 
         String localeSelection = sb.getConfig("locale.language", "default");
-        File targetFile = getLocalizedFile(target, localeSelection);
-        File targetClass = rewriteClassFile(_resourceBase.addPath(target).getFile());
+        Resource targetFile = getLocalizedResource(target, localeSelection);
+		Resource targetClass = null;
+		try {
+			targetClass = _resourceBase.addPath(templateToClass(target));
+		} catch(IOException ignored) {
+		}
         String targetExt = target.substring(target.lastIndexOf('.') + 1);
 
         long now = System.currentTimeMillis();
@@ -794,7 +809,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
             response.setDateHeader(HeaderFramework.EXPIRES, now); // expires now
         }
         
-        if ((targetClass != null)) {
+        if (targetClass != null) {
             serverObjects args = new serverObjects();
             Enumeration<String> argNames = request.getParameterNames();
             while (argNames.hasMoreElements()) {
@@ -830,7 +845,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 }
             } catch (InvocationTargetException | IllegalArgumentException | IllegalAccessException e) {
                 ConcurrentLog.logException(e);
-                throw new ServletException(targetFile.getAbsolutePath());
+                throw new ServletException(target);
             }
 
             if (tmp instanceof RasterPlotter || tmp instanceof EncodedImage || tmp instanceof Image) {
@@ -918,7 +933,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 return;
             }
 
-            if (targetFile.exists() && targetFile.isFile() && targetFile.canRead()) {
+            if (targetFile != null && targetFile.exists() && !targetFile.isDirectory()) {
                 
                 sb.setConfig("server.servlets.called", appendPath(sb.getConfig("server.servlets.called", ""), target));
                 if (args != null && !args.isEmpty()) {
@@ -965,9 +980,9 @@ public class YaCyDefaultServlet extends HttpServlet  {
 
                 if (fileSize <= Math.min(4 * 1024 * 1204, MemoryControl.available() / 100)) {
                     // read file completely into ram, avoid that too many files are open at the same time
-                    fis = new ByteArrayInputStream(FileUtils.read(targetFile));
+                    fis = new ByteArrayInputStream(FileUtils.read(targetFile.getInputStream()));
                 } else {
-                    fis = new BufferedInputStream(new FileInputStream(targetFile));
+                    fis = new BufferedInputStream(targetFile.getInputStream());
                 }
 
                 // set response header
@@ -975,7 +990,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 response.setStatus(HttpServletResponse.SC_OK);
                 ByteArrayOutputStream bas = new ByteArrayOutputStream(4096);
                 // apply templates
-                TemplateEngine.writeTemplate(targetFile.getName(), fis, bas, templatePatterns);                
+                TemplateEngine.writeTemplate(target, fis, bas, templatePatterns);                
                 fis.close();
                 // handle SSI
                 parseSSI (bas.toByteArray(),request,response);

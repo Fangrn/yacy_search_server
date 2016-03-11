@@ -27,6 +27,7 @@ package net.yacy.search.schema;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -76,6 +77,27 @@ public class WebgraphConfiguration extends SchemaConfiguration implements Serial
     public WebgraphConfiguration(final File configurationFile, boolean lazy) throws IOException {
         super(configurationFile);
         this.lazy = lazy;
+        checkConsistency(configurationFile.getAbsolutePath());
+    }
+    
+    /**
+     * Initialize the schema with a given configuration file URL.
+     * The configuration file simply contains a list of lines with keywords
+     * or keyword = value lines (while value is a custom Solr field name
+     * @param configURL
+     * @throws IOException 
+     */
+    public WebgraphConfiguration(final URL configURL, boolean lazy) throws IOException {
+        super(configURL);
+        this.lazy = lazy;
+        checkConsistency(configURL.toString());
+    }
+    
+    /**
+     * Check consistency
+     * @param configPath path of config file
+     */
+    protected void checkConsistency(String configPath) {
         // check consistency: compare with YaCyField enum
         if (this.isEmpty()) return;
         Iterator<Entry> it = this.entryIterator();
@@ -84,14 +106,14 @@ public class WebgraphConfiguration extends SchemaConfiguration implements Serial
                 WebgraphSchema f = WebgraphSchema.valueOf(etr.key());
                 f.setSolrFieldName(etr.getValue());
             } catch (final IllegalArgumentException e) {
-                ConcurrentLog.fine("SolrWebgraphWriter", "solr schema file " + configurationFile.getAbsolutePath() + " defines unknown attribute '" + etr.toString() + "'");
+                ConcurrentLog.fine("SolrWebgraphWriter", "solr schema file " + configPath + " defines unknown attribute '" + etr.toString() + "'");
                 it.remove();
             }
         }
         // check consistency the other way: look if all enum constants in SolrField appear in the configuration file
         for (SchemaDeclaration field: WebgraphSchema.values()) {
             if (this.get(field.name()) == null) {
-                ConcurrentLog.warn("SolrWebgraphWriter", " solr schema file " + configurationFile.getAbsolutePath() + " is missing declaration for '" + field.name() + "'");
+                ConcurrentLog.warn("SolrWebgraphWriter", " solr schema file " + configPath + " is missing declaration for '" + field.name() + "'");
             }
         }
     }

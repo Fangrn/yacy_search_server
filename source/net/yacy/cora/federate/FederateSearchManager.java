@@ -19,24 +19,26 @@
  */
 package net.yacy.cora.federate;
 
-import net.yacy.cora.federate.opensearch.OpenSearchConnector;
 import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+
+import org.apache.solr.common.SolrDocument;
+import org.apache.solr.common.SolrDocumentList;
+
 import net.yacy.cora.document.analysis.Classification;
 import net.yacy.cora.document.id.MultiProtocolURL;
+import net.yacy.cora.federate.opensearch.OpenSearchConnector;
 import net.yacy.cora.federate.solr.connector.SolrConnector;
 import net.yacy.cora.federate.yacy.CacheStrategy;
 import net.yacy.cora.storage.Configuration;
 import net.yacy.cora.storage.Configuration.Entry;
-import net.yacy.cora.storage.Files;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.document.parser.xml.opensearchdescriptionReader;
 import net.yacy.kelondro.data.meta.URIMetadataNode;
@@ -49,8 +51,6 @@ import net.yacy.search.query.QueryModifier;
 import net.yacy.search.query.QueryParams;
 import net.yacy.search.query.SearchEvent;
 import net.yacy.search.schema.WebgraphSchema;
-import org.apache.solr.common.SolrDocument;
-import org.apache.solr.common.SolrDocumentList;
 
 /**
  * Handling of queries to configured remote OpenSearch systems.
@@ -74,16 +74,9 @@ public class FederateSearchManager {
         }
         // Data needed  active  name, url(template), desc, rule-when-to-use, specifics
         confFile = new File(sb.getDataPath(), "DATA/SETTINGS/heuristicopensearch.conf");
-        if (!confFile.exists()) {
-            try {
-                Files.copy(new File(sb.appPath, "defaults/heuristicopensearch.conf"), confFile);
-                File defdir = new File(sb.dataPath, "DATA/SETTINGS/federatecfg");
-                if (!defdir.exists()) {
-                    Files.copy(new File(sb.appPath, "defaults/federatecfg"), defdir);
-                }
-            } catch (IOException ex) {
-            }
-        }
+        sb.copyDefaultsConfigIfNotExists(sb.getDataPath(), "heuristicopensearch.conf");
+        sb.copyDefaultsConfigDirIfNotExists(sb.dataPath, "federatecfg");
+        
         // read settings config file
         if (confFile.exists()) {
             try {

@@ -43,6 +43,8 @@ import java.util.regex.Pattern;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
 
+import com.cybozu.labs.langdetect.Language;
+
 import net.yacy.cora.document.encoding.ASCII;
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.document.id.DigestURL;
@@ -66,6 +68,7 @@ import net.yacy.crawler.retrieval.Response;
 import net.yacy.document.Condenser;
 import net.yacy.document.Document;
 import net.yacy.document.Parser;
+import net.yacy.document.language.Identificator;
 import net.yacy.document.parser.htmlParser;
 import net.yacy.kelondro.data.citation.CitationReference;
 import net.yacy.kelondro.data.citation.CitationReferenceFactory;
@@ -495,14 +498,16 @@ public class Segment {
                     final Document document,
                     final Condenser condenser) {
      // do a identification of the language
-        String language = condenser.language(); // this is a statistical analysation of the content: will be compared with other attributes
+        Language detectedLanguage = condenser.language(); // this is a statistical analysation of the content: will be compared with other attributes
+        String language;
         final String bymetadata = document.dc_language(); // the languageByMetadata may return null if there was no declaration
-        if (language == null) {
+        if (detectedLanguage == null) {
             // no statistics available, we take either the metadata (if given) or the TLD
             language = (bymetadata == null) ? url.language() : bymetadata;
         } else {
+        	language = Identificator.languageCode(detectedLanguage);
             if (bymetadata == null) {
-                if (condenser.languageProbability() < 0.9) { // if probability of statistic is not very high, examine url
+                if (detectedLanguage.prob < 0.9) { // if probability of statistic is not very high, examine url
                     // two possible results: compare and report conflicts
                     if (!language.equals(url.language())) {
                         // see if we have a hint in the url that the statistic was right

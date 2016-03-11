@@ -71,9 +71,9 @@ public final class yacyRelease extends yacyVersion {
 
     // information about latest release, retrieved from download pages
     // this static information should be overwritten by network-specific locations
-    // for details see defaults/yacy.network.freeworld.unit
+    // for details see /defaults/yacy.network.freeworld.unit
     private static Map<yacyUpdateLocation, DevAndMainVersions> latestReleases = new ConcurrentHashMap<yacyUpdateLocation, DevAndMainVersions>();
-    public final static List<yacyUpdateLocation> latestReleaseLocations = new ArrayList<yacyUpdateLocation>(); // will be initialized with value in defaults/yacy.network.freeworld.unit
+    public final static List<yacyUpdateLocation> latestReleaseLocations = new ArrayList<yacyUpdateLocation>(); // will be initialized with value in /defaults/yacy.network.freeworld.unit
     public static String startParameter = "";
 
     private MultiProtocolURL url;

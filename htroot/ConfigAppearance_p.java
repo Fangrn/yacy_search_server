@@ -58,7 +58,7 @@ public class ConfigAppearance_p {
     public static serverObjects respond(@SuppressWarnings("unused") final RequestHeader header, final serverObjects post, final serverSwitch env) {
         final serverObjects prop = new serverObjects();
         final Switchboard sb = (Switchboard) env;
-        final String skinPath = new File(env.getDataPath(), env.getConfig("skinPath", SwitchboardConstants.SKINS_PATH_DEFAULT)).toString();
+        final String skinPath = new File(env.getDataPath(), env.getConfig(SwitchboardConstants.SKINS_PATH, SwitchboardConstants.SKINS_PATH_DEFAULT)).toString();
 
         // Fallback
         prop.put("currentskin", "");

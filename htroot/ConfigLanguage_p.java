@@ -34,7 +34,10 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +48,7 @@ import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.data.Translator;
 import net.yacy.data.WorkTables;
 import net.yacy.kelondro.util.FileUtils;
+import net.yacy.kelondro.util.ResourceUtils;
 import net.yacy.search.Switchboard;
 import net.yacy.server.serverObjects;
 import net.yacy.server.serverSwitch;
@@ -56,13 +60,13 @@ public class ConfigLanguage_p {
 
         final serverObjects prop = new serverObjects();
         Switchboard sb = (Switchboard) env;
-        final File langPath = new File(sb.getAppPath("locale.source", "locales").getAbsolutePath());
+        final URL langPathURL = sb.getAppFileOrDefaultResource("locale.source", "/locales/");
 
         //Fallback
         //prop.put("currentlang", ""); //is done by Translationtemplate
         prop.put("status", "0");//nothing
 
-        List<String> langFiles = Translator.langFiles(langPath);
+        List<URL> langFiles = Translator.langFiles(langPathURL);
         if (langFiles == null) {
             return prop;
         }
@@ -80,7 +84,7 @@ public class ConfigLanguage_p {
                  * directory traversal attacks!
                  */
                 if (langFiles.contains(selectedLanguage) || selectedLanguage.startsWith("default")) {
-                    Translator.changeLang(env, langPath, selectedLanguage);
+                    Translator.changeLang(env, langPathURL, selectedLanguage);
                 }
 
                 //delete language file
@@ -90,8 +94,13 @@ public class ConfigLanguage_p {
                  * read from the language directory. This is very important to prevent
                  * directory traversal attacks!
                  */
-                if (langFiles.contains(selectedLanguage)) {
-                    final File langfile= new File(langPath, selectedLanguage);
+            	File langDir = null;
+            	try {
+					langDir = new File(langPathURL.toURI());
+				} catch (URISyntaxException ignored) {
+				}
+                if (langFiles.contains(selectedLanguage) && langDir != null) {
+                    final File langfile= new File(langDir, selectedLanguage);
                     FileUtils.deletedelete(langfile);
                 }
 
@@ -108,7 +117,7 @@ public class ConfigLanguage_p {
                     return prop;
                 }
                 try {
-                    final File langFile = new File(langPath, url.substring(url.lastIndexOf('/'), url.length()));
+                    final File langFile = new File(new File(langPathURL.toURI()), url.substring(url.lastIndexOf('/'), url.length()));
                     final BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(langFile)));
 
                     while (it.hasNext()) {
@@ -118,16 +127,29 @@ public class ConfigLanguage_p {
                 } catch(final IOException e) {
                     prop.put("status", "2");//error saving the language file
                     return prop;
-                }
+                } catch (URISyntaxException e) {
+                    prop.put("status", "2");//error saving the language file
+                    return prop;
+				}
                 if (post.containsKey("use_lang") && "on".equals(post.get("use_lang"))) {
-                    Translator.changeLang(env, langPath, url.substring(url.lastIndexOf('/'), url.length()));
+                    Translator.changeLang(env, langPathURL, url.substring(url.lastIndexOf('/'), url.length()));
                 }
             }
         }
 
         //re-read language files
-        langFiles = Translator.langFiles(langPath);
-        Collections.sort(langFiles);
+        langFiles = Translator.langFiles(langPathURL);
+        Collections.sort(langFiles, new Comparator<URL>() {
+
+			@Override
+			public int compare(URL o1, URL o2) {
+				int res = 0;
+				if(o1 != null && o2 != null) {
+					res = o1.toExternalForm().compareTo(o2.toExternalForm());
+				}
+				return 0;
+			}
+		});
         final Map<String, String> langNames = Translator.langMap(env);
 
         //virtual entry
@@ -136,8 +158,9 @@ public class ConfigLanguage_p {
         prop.put("langlist_0_selected", "selected=\"selected\"");
 
         int count = 0;
-        for (final String langFile : langFiles) {
+        for (final URL langFileURL : langFiles) {
             //+1 because of the virtual entry "default" at top
+        	String langFile = ResourceUtils.getFileName(langFileURL);
             final String langKey = langFile.substring(0, langFile.length() -4);
             final String langName = langNames.get(langKey);
             prop.put("langlist_" + (count + 1) + "_file", langFile);

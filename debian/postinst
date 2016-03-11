@@ -79,7 +79,7 @@ if [ "$NETWORK" = "url" ]; then
   db_get yacy/network-url
   NETWORK="$RET"
 else
-  NETWORK="defaults/yacy\\.network\\.$NETWORK\\.unit"
+  NETWORK="/defaults/yacy\\.network\\.$NETWORK\\.unit"
 fi
 
 db_get yacy/memory-start
