@@ -221,7 +221,8 @@ defaultFiles = index.html,index.htm,default.html,search.html,console.html,contro
 # The htLocaleLang defines a list of language options as <dir>/<named-language>
 # the <dir> must exist as sub-path to htLocalePath
 # the htLocaleSelection selects from the given locales, value=one-of-<dir>
-locale.source=locales
+# if locale.source is not set here, /locales classpath dir is used instead
+# locale.source=locales
 locale.translated_html=DATA/LOCALE/htroot
 locale.language=default
 
