@@ -176,8 +176,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
             if (rb != null) {
                 _resourceBase = Resource.newResource(rb);
             } else {
-        		URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-        				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+        		URL htrootURL = sb.getHtrootURL();
         		_resourceBase = Resource.newResource(htrootURL);
             }
         } catch (IOException e) {

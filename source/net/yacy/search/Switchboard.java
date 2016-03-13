@@ -252,6 +252,8 @@ public final class Switchboard extends serverSwitch {
     public final File dictionariesPath, classificationPath;
     public File listsPath;
     public File htDocsPath;
+    /** htroot directory url (filesystem dor classpath resource directory) */
+    private URL htrootURL;
     public File workPath;
     public File releasePath;
     public File networkRoot;
@@ -363,6 +365,14 @@ public final class Switchboard extends serverSwitch {
         this.htDocsPath =
             getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT);
         this.log.config("HTDOCS Path:    " + this.htDocsPath.toString());
+        
+		this.htrootURL = getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
+				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+		if(this.htrootURL != null) {
+			this.log.config("Htroot path URL :     " + this.htrootURL.toExternalForm());
+		} else {
+			this.log.severe("No htroot found");
+		}
         
         loadWorkPath();
 
@@ -1367,6 +1377,13 @@ public final class Switchboard extends serverSwitch {
 				this.log.config("loaded badwords from file " + badwordsPath + ", " + badwords.size() + " entries" + sizeMessage);
 			}
 		}
+	}
+	
+	/**
+	 * @return htroot directory url (filesystem dor classpath resource directory)
+	 */
+	public URL getHtrootURL() {
+		return this.htrootURL;
 	}
 
     final String getSysinfo() {

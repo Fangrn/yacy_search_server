@@ -99,8 +99,7 @@ public class Messages_p {
 
         // first reset notification
         try {
-            URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, "/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
-            URL notifierSource = new URL(htrootURL, "env/grafics/empty.gif");
+            URL notifierSource = new URL(sb.getHtrootURL(), "env/grafics/empty.gif");
             final File notifierDest = new File(sb.getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT), "notifier.gif");
             FileUtils.copy(notifierSource, notifierDest);
         } catch (final IOException e) {

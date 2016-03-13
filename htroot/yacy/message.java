@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetAddress;
+import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -42,6 +43,7 @@ import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.cora.util.CommonPattern;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.data.MessageBoard;
+import net.yacy.kelondro.util.FileUtils;
 import net.yacy.peers.Network;
 import net.yacy.peers.Protocol;
 import net.yacy.peers.Seed;
@@ -50,8 +52,6 @@ import net.yacy.search.SwitchboardConstants;
 import net.yacy.server.serverObjects;
 import net.yacy.server.serverSwitch;
 import net.yacy.utils.crypt;
-
-import com.google.common.io.Files;
 
 
 public final class message {
@@ -150,10 +150,10 @@ public final class message {
             messageForwardingViaEmail(sb, msgEntry);
 
             // finally write notification
-            final File notifierSource = new File(sb.getAppPath(), sb.getConfig(SwitchboardConstants.HTROOT_PATH,SwitchboardConstants.HTROOT_PATH_DEFAULT) + "/env/grafics/message.gif");
             final File notifierDest   = new File(sb.getDataPath(SwitchboardConstants.HTDOCS_PATH, SwitchboardConstants.HTDOCS_PATH_DEFAULT), "notifier.gif");
             try {
-                Files.copy(notifierSource, notifierDest);
+                final URL notifierSource = new URL(sb.getHtrootURL(), "env/grafics/message.gif");
+                FileUtils.copy(notifierSource, notifierDest);
             } catch (final IOException e) {
             	ConcurrentLog.severe("MESSAGE", "NEW MESSAGE ARRIVED! (error: " + e.getMessage() + ")");
 

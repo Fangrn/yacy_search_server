@@ -118,8 +118,7 @@ public class Jetty9HttpServerImpl implements YaCyHttpServer {
         htrootContext.setContextPath("/");
         htrootContext.setErrorHandler(new YaCyErrorHandler()); // handler for custom error page
         try {
-    		URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-    				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+    		URL htrootURL = sb.getHtrootURL();
        		Resource resourceBase = Resource.newResource(htrootURL);	
         	if(resourceBase == null || !resourceBase.exists() || !resourceBase.isDirectory()) {
                 ConcurrentLog.severe("SERVER", "could not find directory: htroot ");

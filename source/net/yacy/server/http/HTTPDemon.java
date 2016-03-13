@@ -201,8 +201,7 @@ public final class HTTPDemon {
             tp.put("date", systemDate);
 
             // rewrite the file
-    		URL htrootURL = switchboard.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-    				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+    		URL htrootURL = switchboard.getHtrootURL();
     		if(htrootURL == null) {
     			throw new IOException("no htroot found");
     		}

@@ -50,11 +50,7 @@ public class Banner {
         final serverObjects post,
         final serverSwitch env) throws IOException {
         final Switchboard sb = (Switchboard) env;
-        URL htroot = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, "/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
-    	if(htroot == null) {
-    		throw new IOException("no htroot found");
-    	}
-    	URL imageURL = new URL(htroot, "env/grafics/yacy.png");
+
         int width = 468;
         int height = 60;
         String bgcolor = "e7effc";
@@ -126,19 +122,26 @@ public class Banner {
         if (!net.yacy.peers.graphics.Banner.logoIsLoaded()) {
             // do not write a cache to disc; keep in RAM
             ImageIO.setUseCache(false);
-            InputStream imageStream = imageURL.openStream();
-            if(imageStream == null) {
-            	throw new IOException("Banner image URL could not be open : " + imageURL.toExternalForm());
-            }
+            InputStream imageStream = null;
             try {
-            final BufferedImage logo = ImageIO.read(imageStream);
-            return net.yacy.peers.graphics.Banner.getBannerPicture(
+            	URL imageURL = new URL(sb.getHtrootURL(), "env/grafics/yacy.png");
+                imageStream = imageURL.openStream();
+                if(imageStream == null) {
+                	throw new IOException("Banner image URL could not be open : " + imageURL.toExternalForm());
+                }
+            	final BufferedImage logo = ImageIO.read(imageStream);
+            	return net.yacy.peers.graphics.Banner.getBannerPicture(
                 data,
                 1000,
                 logo);
             } finally {
-            	/* ImageIO.read doesn't close stream */
-            	imageStream.close();
+            	if(imageStream != null) {
+            		try {
+            			/* ImageIO.read doesn't close stream */
+            			imageStream.close();
+            		} catch(IOException ignored) {
+            		}
+            	}
             }
         }
 

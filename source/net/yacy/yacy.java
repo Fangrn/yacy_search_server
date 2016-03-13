@@ -42,8 +42,6 @@ import java.nio.channels.FileLock;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 
-import org.eclipse.jetty.util.URIUtil;
-
 import net.yacy.cora.date.GenericFormatter;
 import net.yacy.cora.document.id.DigestURL;
 import net.yacy.cora.federate.yacy.CacheStrategy;
@@ -261,9 +259,7 @@ public final class yacy {
             File notifierFile = new File(htDocsPath, "notifier.gif");
 			if (!notifierFile.exists()) {
 				try {
-					final URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-							URIUtil.SLASH + SwitchboardConstants.HTROOT_PATH_DEFAULT);
-					FileUtils.copy(new URL(htrootURL, "env/grafics/empty.gif"), notifierFile);
+					FileUtils.copy(new URL(sb.getHtrootURL(), "env/grafics/empty.gif"), notifierFile);
 				} catch (final IOException e) {
 				}
 			}

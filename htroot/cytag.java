@@ -26,8 +26,9 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 import java.awt.Image;
-import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 
 import net.yacy.cora.date.GenericFormatter;
 import net.yacy.cora.document.id.MultiProtocolURL;
@@ -37,6 +38,7 @@ import net.yacy.document.ImageParser;
 import net.yacy.document.parser.html.CharacterCoding;
 import net.yacy.kelondro.util.FileUtils;
 import net.yacy.search.Switchboard;
+import net.yacy.search.SwitchboardConstants;
 import net.yacy.server.serverObjects;
 import net.yacy.server.serverSwitch;
 
@@ -70,13 +72,16 @@ public class cytag {
         } else {
             defaultimage = "redpillmini.png";
         }
-        final File iconfile = new File(sb.getAppPath(), "/htroot/env/grafics/" + defaultimage);
         
         byte[] imgb = null;
-        try {
-            imgb = FileUtils.read(iconfile);
-        } catch (final IOException e) {
-             return null;
+		try {
+			URL iconURL = new URL(sb.getHtrootURL(), "env/grafics/" + defaultimage);
+			InputStream iconStream = iconURL.openStream();
+			if (iconStream != null) {
+				imgb = FileUtils.read(iconStream);
+			}
+		} catch (final IOException e) {
+			  return null;
         }
         if (imgb == null) return null;
         
