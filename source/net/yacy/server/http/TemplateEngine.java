@@ -54,9 +54,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PushbackInputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
-
-import org.eclipse.jetty.util.resource.Resource;
 
 import net.yacy.cora.document.encoding.ASCII;
 import net.yacy.cora.document.encoding.UTF8;
@@ -417,12 +416,12 @@ public final class TemplateEngine {
                         BufferedReader br = null;
                         try{
                             //br = new BufferedReader(new InputStreamReader(new FileInputStream( filename ))); //Simple Include
-							Resource localizedResource = HTTPDFileHandler.getLocalizedFile(UTF8.String(filename));
+							URL localizedResource = HTTPDFileHandler.getLocalizedFile(UTF8.String(filename));
 							if (localizedResource == null) {
 								ConcurrentLog.severe("FILEHANDLER",
 										"Include Error with file " + UTF8.String(filename) + " : not found");
 							} else {
-								br = new BufferedReader(new InputStreamReader(localizedResource.getInputStream(),
+								br = new BufferedReader(new InputStreamReader(localizedResource.openStream(),
 										StandardCharsets.UTF_8)); // YaCy (with
 																	// Locales)
 								// Read the Include

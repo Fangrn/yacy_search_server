@@ -59,10 +59,8 @@ package net.yacy.server.http;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
-
-import org.eclipse.jetty.util.URIUtil;
-import org.eclipse.jetty.util.resource.Resource;
 
 import net.yacy.cora.document.analysis.Classification;
 import net.yacy.cora.util.ConcurrentLog;
@@ -77,7 +75,7 @@ public final class HTTPDFileHandler {
 
     public  static File     htDocsPath     = null;
     public  static String[] defaultFiles   = null;
-    private static Resource htDefaultResource  = null;
+    private static URL htDefaultResource  = null;
     private static File     htLocalePath   = null;
     public  static String   indexForward   = "";
 
@@ -110,15 +108,8 @@ public final class HTTPDFileHandler {
 
             // create htLocaleDefault, htLocalePath
 			if (htDefaultResource == null) {
-				String htDefaultPath = theSwitchboard.getConfig("htDefaultPath", "");
-				if (htDefaultPath.isEmpty()) {
-					htDefaultResource = Resource.newClassPathResource(URIUtil.SLASH + SwitchboardConstants.HTROOT_PATH_DEFAULT);
-				} else {
-					File htDefaultFile = theSwitchboard.getAppPath("htDefaultPath", "htDefaultPath");
-					if (htDefaultFile.isFile()) {
-						htDefaultResource = Resource.newResource(htDefaultFile);
-					}
-				}
+				htDefaultResource = theSwitchboard.getAppFileOrDefaultResource("htDefaultPath",
+						"/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
 			}
             if (htLocalePath == null) htLocalePath = theSwitchboard.getDataPath("locale.translated_html", "DATA/LOCALE/htroot");
         }
@@ -134,27 +125,33 @@ public final class HTTPDFileHandler {
 
     /** Returns a resource to the localized or default file according to the locale.language (from he switchboard)
      * @param path relative from htroot */
-    public static Resource getLocalizedFile(final String path){
-        String localeSelection = switchboard.getConfig("locale.language","default");
-        if (!(localeSelection.equals("default"))) {
-            final File localePath = new File(htLocalePath, localeSelection + '/' + path);
-            if (localePath.exists()) return Resource.newResource(localePath);  // avoid "NoSuchFile" troubles if the "localeSelection" is misspelled
-        }
-        
-        final File docsPath  = new File(htDocsPath, path);
-        if (docsPath.exists()) return Resource.newResource(docsPath);
-        try {
-			return htDefaultResource.addPath(path);
+	public static URL getLocalizedFile(final String path) {
+		String localeSelection = switchboard.getConfig("locale.language", "default");
+		try {
+			if (!(localeSelection.equals("default"))) {
+				final File localePath = new File(htLocalePath, localeSelection + '/' + path);
+				if (localePath.exists()) {
+					return localePath.getAbsoluteFile().toURI().toURL();
+				}
+			}
+
+			final File docsPath = new File(htDocsPath, path);
+			if (docsPath.exists()) {
+				return docsPath.getAbsoluteFile().toURI().toURL();
+			}
+			return new URL(htDefaultResource, path);
 		} catch (IOException e) {
 			return null;
 		}
-    }
+	}
 
-    public static final Resource getOverlayedFile(final String path) {
-    	Resource targetFile;
-        targetFile = getLocalizedFile(path);
-        if (targetFile == null || !targetFile.exists()) {
-            targetFile = Resource.newResource(new File(htDocsPath, path));
+    public static final URL getOverlayedFile(final String path) {
+    	URL targetFile = getLocalizedFile(path);
+        if (targetFile == null) {
+            try {
+				targetFile = new File(htDocsPath, path).getAbsoluteFile().toURI().toURL();
+			} catch (MalformedURLException ignored) {
+			}
         }
         return targetFile;
     }

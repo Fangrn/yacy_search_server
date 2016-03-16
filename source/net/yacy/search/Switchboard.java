@@ -367,7 +367,7 @@ public final class Switchboard extends serverSwitch {
         this.log.config("HTDOCS Path:    " + this.htDocsPath.toString());
         
 		this.htrootURL = getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+				"/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
 		if(this.htrootURL != null) {
 			this.log.config("Htroot path URL :     " + this.htrootURL.toExternalForm());
 		} else {

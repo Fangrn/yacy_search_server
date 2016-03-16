@@ -30,10 +30,10 @@
             <directory>dictionaries</directory>
             <outputDirectory>dictionaries</outputDirectory>
         </fileSet>
-        <fileSet>
+<!--         <fileSet>
             <directory>htroot</directory>
             <outputDirectory>htroot</outputDirectory>
-        </fileSet>
+        </fileSet> -->
         <fileSet>
             <directory>langstats</directory>
             <outputDirectory>langstats</outputDirectory>

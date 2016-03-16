@@ -143,7 +143,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
     protected File _htLocalePath;
     protected File _htDocsPath;    
     protected serverClassLoader provider;
-    protected ConcurrentHashMap<Resource, SoftReference<Method>> templateMethodCache = null;
+    protected ConcurrentHashMap<String, SoftReference<Method>> templateMethodCache = null;
     // settings for multipart/form-data
     protected static final File TMPDIR = new File(System.getProperty("java.io.tmpdir"));
     protected static final int SIZE_FILE_THRESHOLD = 100 * 1024 * 1024; // 100 MB is a lot but appropriate for multi-document pushed using the push_p.json servlet
@@ -193,7 +193,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
             ConcurrentLog.fine("FILEHANDLER","YaCyDefaultServlet: resource base = " + _resourceBase);
         }
         provider = new serverClassLoader(this._resourceBase);
-        templateMethodCache = new ConcurrentHashMap<Resource, SoftReference<Method>>();
+        templateMethodCache = new ConcurrentHashMap<String, SoftReference<Method>>();
     }
 
 
@@ -664,8 +664,8 @@ public class YaCyDefaultServlet extends HttpServlet  {
     }
 
     
-    protected Object invokeServlet(final Resource targetClass, final RequestHeader request, final serverObjects args) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
-        return rewriteMethod(targetClass).invoke(null, new Object[]{request, args, Switchboard.getSwitchboard()}); // add switchboard
+    protected Object invokeServlet(final String className, final RequestHeader request, final serverObjects args) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
+        return rewriteMethod(className).invoke(null, new Object[]{request, args, Switchboard.getSwitchboard()}); // add switchboard
     }
 
     protected RequestHeader generateLegacyRequestHeader(HttpServletRequest request, String target, String targetExt) {
@@ -729,7 +729,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
 	/**
 	 * @param template
 	 *            template file name.
-	 * @return resource class name corresponding to template or null when
+	 * @return class binary name (for example htroot.NetworkHistory) corresponding to template or null when
 	 *         template has no extension.
 	 */
 	protected String templateToClass(final String template) {
@@ -737,32 +737,37 @@ public class YaCyDefaultServlet extends HttpServlet  {
 		if (template != null) {
 			final int p = template.lastIndexOf('.');
 			if (p >= 0) {
-				className = template.substring(0, p) + ".class";
+				className = template.substring(0, p).replace('/', '.');
+				if(className.startsWith(".")) {
+					className = "net.yacy.htroot" + className;
+				} else {
+					className = "net.yacy.htroot." + className;
+				}
 			}
 		}
 		return className;
 	}
 
 	/**
-	 * @param classResource class file to load. Class is supposed to have a "respond(RequestHeader, serverObjects, serverSwitch)" method
+	 * @param className class binary name to load. Class is supposed to have a "respond(RequestHeader, serverObjects, serverSwitch)" method
 	 * @return class "respond" method
 	 * @throws InvocationTargetException when class doesn't exists or doesn't have a "respond" method
 	 */
-    protected Method rewriteMethod(final Resource classResource) throws InvocationTargetException {
+    protected Method rewriteMethod(final String className) throws InvocationTargetException {
         Method m;
         // now make a class out of the stream
         try {
-            final SoftReference<Method> ref = templateMethodCache.get(classResource);
+            final SoftReference<Method> ref = templateMethodCache.get(className);
             if (ref != null) {
                 m = ref.get();
                 if (m == null) {
-                    templateMethodCache.remove(classResource);
+                    templateMethodCache.remove(className);
                 } else {
                     return m;
                 }
             }
 
-            final Class<?> c = provider.loadClassResource(classResource);
+            final Class<?> c = Class.forName(className);
             
             final Class<?>[] params = (Class<?>[]) Array.newInstance(Class.class, 3);
             params[0]=  RequestHeader.class;
@@ -774,14 +779,17 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 templateMethodCache.clear();
             } else {
                 // store the method into the cache
-                templateMethodCache.put(classResource, new SoftReference<Method>(m));
+                templateMethodCache.put(className, new SoftReference<Method>(m));
             }
         } catch (final ClassNotFoundException e) {
-            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: class " + classResource + " is missing:" + e.getMessage());
-            throw new InvocationTargetException(e, "class " + classResource + " is missing:" + e.getMessage());
+            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: class " + className + " is missing:" + e.getMessage());
+            throw new InvocationTargetException(e, "class " + className + " is missing:" + e.getMessage());
         } catch (final NoSuchMethodException e) {
-            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: method 'respond' not found in class " + classResource + ": " + e.getMessage());
-            throw new InvocationTargetException(e, "method 'respond' not found in class " + classResource + ": " + e.getMessage());
+            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: method 'respond' not found in class " + className + ": " + e.getMessage());
+            throw new InvocationTargetException(e, "method 'respond' not found in class " + className + ": " + e.getMessage());
+        } catch (final LinkageError e) {
+            ConcurrentLog.severe("FILEHANDLER","YaCyDefaultServlet: error loading class " + className + " : " + e.getMessage());
+            throw new InvocationTargetException(e, "Error loading class " + className + " : " + e.getMessage());
         }
         return m;
     }
@@ -791,11 +799,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
 
         String localeSelection = sb.getConfig("locale.language", "default");
         Resource targetFile = getLocalizedResource(target, localeSelection);
-		Resource targetClass = null;
-		try {
-			targetClass = _resourceBase.addPath(templateToClass(target));
-		} catch(IOException ignored) {
-		}
+		String className = templateToClass(target);
         String targetExt = target.substring(target.lastIndexOf('.') + 1);
 
         long now = System.currentTimeMillis();
@@ -808,7 +812,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
             response.setDateHeader(HeaderFramework.EXPIRES, now); // expires now
         }
         
-        if (targetClass != null) {
+        if (className != null) {
             serverObjects args = new serverObjects();
             Enumeration<String> argNames = request.getParameterNames();
             while (argNames.hasMoreElements()) {
@@ -838,9 +842,9 @@ public class YaCyDefaultServlet extends HttpServlet  {
             try {
                 if (args.isEmpty()) {
                     // yacy servlets typically test for args != null (but not for args .isEmpty())
-                    tmp = invokeServlet(targetClass, legacyRequestHeader, null); 
+                    tmp = invokeServlet(className, legacyRequestHeader, null); 
                 } else {
-                    tmp = invokeServlet(targetClass, legacyRequestHeader, args);
+                    tmp = invokeServlet(className, legacyRequestHeader, args);
                 }
             } catch (InvocationTargetException | IllegalArgumentException | IllegalAccessException e) {
                 ConcurrentLog.logException(e);

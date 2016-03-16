@@ -69,10 +69,14 @@
 				<targetPath>locales</targetPath>
 				<directory>locales</directory>
 			</resource>
+			<resource>
+				<targetPath>net/yacy/htroot</targetPath>
+				<directory>source/net/yacy/htroot</directory>
+			</resource>
 		</resources>
 
         <plugins>
-            <!-- included to make htroot visible in IDE (Netbeans) -->
+<!--             included to make htroot visible in IDE (Netbeans)
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-war-plugin</artifactId>
@@ -80,7 +84,7 @@
                 <configuration>
                     <warSourceDirectory>htroot</warSourceDirectory>
                 </configuration>
-            </plugin>
+            </plugin> -->
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -95,6 +99,7 @@
                         thus it is excluded here to prevent Maven compile error "duplicate source"
                         -->
                         <exclude>net/yacy/peers/operation/*.java</exclude>
+                        <exclude>net/yacy/htroot/processing/**</exclude>
                     </excludes>  
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>          
@@ -124,13 +129,6 @@
                 <version>2.6.1</version>
                 <configuration>
                     <filesets>
-                        <!-- clean htroot servlet classes -->
-                        <fileset>
-                            <directory>htroot</directory>
-                            <includes>
-                                <include>**/*.class</include>
-                            </includes>
-                        </fileset>
                         <!-- clean test data -->
                         <fileset>
                             <directory>test/DATA</directory>
@@ -140,7 +138,7 @@
             </plugin>
 
            <!-- compile htroot -->
-            <plugin>
+<!--             <plugin>
                 <artifactId>maven-antrun-plugin</artifactId>
                 <version>1.8</version>
                 <executions>
@@ -164,7 +162,7 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
+            </plugin> -->
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -179,7 +177,7 @@
                     <encoding>UTF-8</encoding>
                     <windowtitle>YaCy API: javadoc documentation</windowtitle>
                     <excludes>
-                        htroot/*.java
+                        source/net/yacy/htroot/*.java
                     </excludes>
                     <failOnError>false</failOnError>
                 </configuration>
@@ -294,7 +292,7 @@
 		<build>
 			<plugins>
 				<!-- copy htroot before packaging -->
-				<plugin>
+<!-- 				<plugin>
 					<artifactId>maven-resources-plugin</artifactId>
 					<version>2.7</version>
 					<executions>
@@ -314,7 +312,7 @@
 							</configuration>
 						</execution>
 					</executions>
-				</plugin>
+				</plugin> -->
 
 				<!-- specific jar configuration for all-in-one jar -->
 				<plugin>

@@ -49,8 +49,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
-import org.eclipse.jetty.util.URIUtil;
-
 import net.yacy.cora.util.CommonPattern;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.kelondro.util.FileUtils;
@@ -287,7 +285,7 @@ public class Translator {
             env.setConfig("locale.language", "default");
             ret = true;
         } else {
-            URL htrootURL = env.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, URIUtil.SLASH + SwitchboardConstants.HTROOT_PATH_DEFAULT);
+            URL htrootURL = env.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, "/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT);
             final File destDir = new File(env.getDataPath("locale.translated_html", "DATA/LOCALE/htroot"), lang);// cut
             
 			if(htrootURL != null) {
