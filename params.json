@@ -1,0 +1,6 @@
+{
+  "name": "Yacy search server experiments",
+  "tagline": "Work in progress on YaCy Search Engine application",
+  "body": "## YaCy experiments\r\n\r\n### Simplify YaCy first launch\r\nThis is an attempt to simplify YaCy first launch. Indeed YaCy main website (http://yacy.net) currently only provide following deployment options :\r\n - Windows installer\r\n - Debian package\r\n - Mac Os application\r\n - Cross-platform tar.gz archive with .bat and .sh launch scripts\r\n - Cross-platform sources to compile\r\n\r\nI think some other packaging options could be useful and may help newcomers to try YaCy. \r\n - Self-contained portable application (with embedded jre)\r\n - Cross-platform :\r\n  - Runnable jar\r\n  - Java Web Start link\r\n  - Browser applet\r\n",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}
