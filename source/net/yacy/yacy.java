@@ -663,15 +663,11 @@ public final class yacy {
 	        final long startupMemFree  = MemoryControl.free();
 	        final long startupMemTotal = MemoryControl.total();
 
-	        // maybe go into headless awt mode: we have three cases depending on OS and one exception:
-	        // windows   : better do not go into headless mode
-	        // mac       : go into headless mode because an application is shown in gui which may not be wanted
-	        // linux     : go into headless mode because this does not need any head operation
-	        // exception : if the -gui option is used then do not go into headless mode since that uses a gui
-	        boolean headless = true;
-	        if (OS.isWindows) headless = false;
+	        /* headless awt mode : do not override system property eventually set by calling script 
+	          exception : if the -gui option is used then do not go into headless mode since that uses a gui */
+	        boolean headless = Boolean.parseBoolean(System.getProperty("java.awt.headless", "false"));
 	        if (args.length >= 1 && args[0].toLowerCase().equals("-gui")) headless = false;
-	        System.setProperty("java.awt.headless", headless ? "true" : "false");
+	        System.setProperty("java.awt.headless", Boolean.toString(headless));
 
 	        String s = ""; for (final String a: args) s += a + " ";
 	        yacyRelease.startParameter = s.trim();

@@ -27,18 +27,18 @@
 
 package net.yacy.gui;
 
-import java.awt.Image;
-import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Image;
 import java.awt.MenuItem;
 import java.awt.PopupMenu;
 import java.awt.SystemTray;
 import java.awt.TrayIcon;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.net.URL;
 
 import javax.imageio.ImageIO;
 
@@ -63,7 +63,7 @@ public final class Tray {
 	private boolean appIsReady = false;
 	private boolean menuEnabled = true;
     private BufferedImage[] progressIcons = null;
-    private final String iconPath;
+    private final URL iconPath;
     
     private MenuItem menuItemHeadline = null;
     private MenuItem menuItemSearch = null;
@@ -74,11 +74,11 @@ public final class Tray {
 		this.sb = sb_par;
 		this.menuEnabled = sb.getConfigBool(SwitchboardConstants.TRAY_MENU_ENABLED, true);
 		this.trayLabel = sb.getConfig(SwitchboardConstants.TRAY_ICON_LABEL, "YaCy");
-		this.iconPath = sb.getAppPath().toString() + "/addon/YaCy_TrayIcon.png".replace("/", File.separator);
+		
+		this.iconPath = this.getClass().getResource("/addon/YaCy_TrayIcon.png");
 		if (useTray()) {
 		    try {
-			    System.setProperty("java.awt.headless", "false"); // we have to switch off headless mode, else all will fail
-			    if (SystemTray.isSupported()) {
+			    if (SystemTray.isSupported() && this.iconPath != null) {
                     ActionListener al = new ActionListener() {
     					@Override
                         public void actionPerformed(final ActionEvent e) {
@@ -86,8 +86,8 @@ public final class Tray {
     					}
     				};
     				ImageIO.setUseCache(false); // do not write a cache to disc; keep in RAM
-    			    final Image trayIcon = ImageIO.read(new File(iconPath)); // 128x128
-                    final Image progressBooting = ImageIO.read(new File(sb.getAppPath().toString() + "/addon/progress_booting.png".replace("/", File.separator))); // 128x28
+    			    final Image trayIcon = ImageIO.read(this.iconPath); // 128x128
+                    final Image progressBooting = ImageIO.read(this.getClass().getResource("/addon/progress_booting.png")); // 128x28
                     final BufferedImage progress = getProgressImage();
                     this.progressIcons = new BufferedImage[4];
                     for (int i = 0; i < 4; i++) {
@@ -120,8 +120,8 @@ public final class Tray {
 	
 	private boolean useTray() {
 	    final boolean trayIconEnabled = sb.getConfigBool(SwitchboardConstants.TRAY_ICON_ENABLED, false);
-        final boolean trayIconForced = sb.getConfigBool(SwitchboardConstants.TRAY_ICON_FORCED, false);
-        return trayIconEnabled && (OS.isWindows || OS.isMacArchitecture || trayIconForced);
+	    String headless = System.getProperty("java.awt.headless", "false");
+        return trayIconEnabled && !Boolean.parseBoolean(headless);
 	}
 	
 	private class TrayAnimation extends Thread {
@@ -136,7 +136,7 @@ public final class Tray {
 	        }
             try {
                 ImageIO.setUseCache(false); // do not write a cache to disc; keep in RAM
-                Image trayIcon = ImageIO.read(new File(Tray.this.iconPath));
+                Image trayIcon = ImageIO.read(Tray.this.iconPath);
                 ti.setImage(trayIcon);
                 ti.setToolTip(readyMessage());
                 setDockIcon(trayIcon);
@@ -163,7 +163,7 @@ public final class Tray {
 		if (useTray()) {
     		try {
     		    ImageIO.setUseCache(false); // do not write a cache to disc; keep in RAM
-    		    Image trayIcon = ImageIO.read(new File(this.iconPath));
+    		    Image trayIcon = ImageIO.read(this.iconPath);
     	        if (ti != null) {
     	            ti.setImage(trayIcon);
     	            ti.setToolTip(readyMessage());
@@ -184,8 +184,8 @@ public final class Tray {
             try {
                 if (ti != null) {
                     ImageIO.setUseCache(false); // do not write a cache to disc; keep in RAM
-                    Image trayIcon = ImageIO.read(new File(this.iconPath)); // 128x128
-                    final Image progressShutdown = ImageIO.read(new File(sb.getAppPath().toString() + "/addon/progress_shutdown.png".replace("/", File.separator))); // 128x28
+                    Image trayIcon = ImageIO.read(this.iconPath); // 128x128
+                    final Image progressShutdown = ImageIO.read(this.getClass().getResource("/addon/progress_shutdown.png")); // 128x28
                     final BufferedImage progress = getProgressImage();
                     BufferedImage shutdownIcon;
                     shutdownIcon = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
@@ -211,9 +211,8 @@ public final class Tray {
     }
 
     private BufferedImage getProgressImage() throws IOException {
-        final String progressPath = sb.getAppPath().toString() + "/addon/progressbar.png".replace("/", File.separator);
         ImageIO.setUseCache(false); // do not write a cache to disc; keep in RAM
-        Image progress_raw = ImageIO.read(new File(progressPath)); // 149x56
+        Image progress_raw = ImageIO.read(this.getClass().getResource("/addon/progressbar.png")); // 149x56
         BufferedImage progress = new BufferedImage(149, 56, BufferedImage.TYPE_INT_ARGB);
         Graphics2D progressg = progress.createGraphics();
         progressg.drawImage(progress_raw, 0, 0, null);
@@ -233,18 +232,22 @@ public final class Tray {
         if (deutsch)
             return "YaCy startet, bitte warten...";
         else if (french)
-            return "S'il vous pla��t attendre jusqu'�� YaCy est d��marr��.";
+            return "YaCy est en cours de démarrage, veuillez patienter...";
         else
             return "YaCy is starting, please wait...";
     }
 
     private String readyMessage() {
         if (deutsch) return "YaCy laeuft unter http://localhost:" + sb.getLocalPort();
+        else if(french)
+        	return "YaCy est en cours d'exécution à l'adresse http://localhost:" + sb.getLocalPort(); 
         return "YaCy is running at http://localhost:" + sb.getLocalPort();
     }
 
     private String shutdownMessage() {
         if (deutsch) return "YaCy wird beendet, bitte warten...";
+        else if(french)
+        	return "YaCy est en cours d'arrêt, veuillez patienter..."; 
         return "YaCy will shut down, please wait...";
     }
     
@@ -323,7 +326,7 @@ public final class Tray {
 		if(deutsch) 
 			label = "YaCy Beenden";
 		else if(french)
-			label = "Arr��t YaCy";
+			label = "Arrêter YaCy";
 		else
 			label = "Shutdown YaCy";
 		this.menuItemTerminate = new MenuItem(label);

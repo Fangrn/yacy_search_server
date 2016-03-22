@@ -73,6 +73,14 @@
 				<targetPath>net/yacy/htroot</targetPath>
 				<directory>source/net/yacy/htroot</directory>
 			</resource>
+			<resource>
+				<targetPath>addon</targetPath>
+				<directory>addon</directory>
+                <includes>
+                    <include>*.png</include>
+                    <include>*.ico</include>
+               </includes>  
+			</resource>
 		</resources>
 
         <plugins>
