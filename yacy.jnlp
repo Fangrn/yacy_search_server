@@ -8,7 +8,9 @@
         <description>YaCy decentralized web search</description>
         <description kind="one-line">YaCy</description>
         <description kind="tooltip">YaCy</description>
-        <icon href="http://yacy.net/images/YaCyLogo2011_60.png"/> 
+        <icon href="YaCyLogo_64x64.png" kind="splash" width="64" height="64"/>
+        <icon href="YaCyLogo_64x64.png" kind="default" width="64" height="64"/>
+        <icon href="YaCy.ico" kind="shortcut" width="48" height="48"/> 
         <offline-allowed/>
         <shortcut>
             <desktop/>
