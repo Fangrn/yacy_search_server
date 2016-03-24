@@ -24,5 +24,8 @@
         <j2se version="1.7+"/>
         <jar href="yacycore-1.83-9725.jar" size="81961971"/>
     </resources>
-    <application-desc main-class="net.yacy.yacy"/>
+    <application-desc main-class="net.yacy.yacy">
+    	<argument>-startup</argument>
+		<argument>yacy-1.83-data</argument>
+    </application-desc>
 </jnlp>
