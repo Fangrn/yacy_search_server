@@ -244,7 +244,7 @@ public class ResourceObserver {
     public long getUsableSpace() {
     	long space = 0L;
     	try {
-    		this.path.getUsableSpace();
+    		space = this.path.getUsableSpace();
     	} catch(SecurityException e) {
     		log.warn("Security manager denies getting usable space");
     	}
