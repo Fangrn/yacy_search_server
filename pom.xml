@@ -145,33 +145,6 @@
                 </configuration>
             </plugin>
 
-           <!-- compile htroot -->
-<!--             <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <version>1.8</version>
-                <executions>
-                    <execution>
-                        <id>compile-htroot</id>
-                        <phase>compile</phase>
-                        <configuration>
-                            <target>
-                                <javac fork="true"  srcdir="htroot"
-                                       excludes="processing/**"
-                                       source="${maven.compiler.source}" target="${maven.compiler.target}"
-                                       debug="true" debuglevel="lines,vars,source" 
-                                       includeantruntime="false" encoding="UTF-8">
-                                    <classpath refid="maven.compile.classpath"/>
-                                    <compilerarg value="-Xlint"/>
-                                </javac>
-                            </target>
-                        </configuration>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin> -->
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
@@ -372,11 +345,35 @@
 									<!-- Merge SPI services declarations (needed for solr and lucene) -->
 									<transformer
 										implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+									<!-- Aggregate notices -->
+                					<transformer implementation="org.apache.maven.plugins.shade.resource.ApacheNoticeResourceTransformer">
+                    					<addHeader>false</addHeader>
+                					</transformer>
 									<!-- Include all necessary additional resources -->
 									<transformer
 										implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
 										<resource>META-INF/AUTHORS</resource>
 										<file>AUTHORS</file>
+									</transformer>
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+										<resource>META-INF/gpl.txt</resource>
+										<file>gpl.txt</file>
+									</transformer>
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+										<resource>META-INF/lgpl21.txt</resource>
+										<file>lgpl21.txt</file>
+									</transformer>
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+										<resource>META-INF/COPYRIGHT</resource>
+										<file>COPYRIGHT</file>
+									</transformer>
+									<transformer
+										implementation="org.apache.maven.plugins.shade.resource.IncludeResourceTransformer">
+										<resource>META-INF/readme.txt</resource>
+										<file>readme.txt</file>
 									</transformer>
 								</transformers>
 								<filters>
