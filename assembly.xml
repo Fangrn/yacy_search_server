@@ -23,32 +23,16 @@
             <outputDirectory>bin</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>defaults</directory>
-            <outputDirectory>defaults</outputDirectory>
-        </fileSet>
-        <fileSet>
             <directory>dictionaries</directory>
             <outputDirectory>dictionaries</outputDirectory>
         </fileSet>
-<!--         <fileSet>
-            <directory>htroot</directory>
-            <outputDirectory>htroot</outputDirectory>
-        </fileSet> -->
         <fileSet>
             <directory>langstats</directory>
             <outputDirectory>langstats</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>locales</directory>
-            <outputDirectory>locales</outputDirectory>
-        </fileSet>
-        <fileSet>
             <directory>ranking</directory>
             <outputDirectory>ranking</outputDirectory>
-        </fileSet>
-        <fileSet>
-            <directory>skins</directory>
-            <outputDirectory>skins</outputDirectory>
         </fileSet>
         <fileSet>
             <directory>vocabularies</directory>
