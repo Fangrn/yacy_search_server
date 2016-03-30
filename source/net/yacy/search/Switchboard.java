@@ -367,7 +367,7 @@ public final class Switchboard extends serverSwitch {
         this.log.config("HTDOCS Path:    " + this.htDocsPath.toString());
         
 		this.htrootURL = getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-				"/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+				SwitchboardConstants.HTROOT_PATH_DEFAULT_RESOURCE);
 		if(this.htrootURL != null) {
 			this.log.config("Htroot path URL :     " + this.htrootURL.toExternalForm());
 		} else {
@@ -857,7 +857,7 @@ public final class Switchboard extends serverSwitch {
 
         // init messages: clean up message symbol
 		URL htrootURL = sb.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH,
-				"/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+				SwitchboardConstants.HTROOT_PATH_DEFAULT_RESOURCE);
 		if (htrootURL == null) {
 			ConcurrentLog.severe("Switchboard", "htroot not found!");
 		} else {

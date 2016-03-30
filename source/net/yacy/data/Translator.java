@@ -285,7 +285,7 @@ public class Translator {
             env.setConfig("locale.language", "default");
             ret = true;
         } else {
-            URL htrootURL = env.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, "/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT);
+            URL htrootURL = env.getAppFileOrDefaultResource(SwitchboardConstants.HTROOT_PATH, SwitchboardConstants.HTROOT_PATH_DEFAULT_RESOURCE);
             final File destDir = new File(env.getDataPath("locale.translated_html", "DATA/LOCALE/htroot"), lang);// cut
             
 			if(htrootURL != null) {

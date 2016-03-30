@@ -453,7 +453,10 @@ public final class SwitchboardConstants {
      * original servlets, their stylesheets, scripts, etc. lie. It is also home of the XML-interface to YaCy</p>
      */
     public static final String HTROOT_PATH              = "htRootPath";
+    /** Default htroot path folder name */
     public static final String HTROOT_PATH_DEFAULT      = "htroot";
+    /** Default htroot classpath resource folder */
+    public static final String HTROOT_PATH_DEFAULT_RESOURCE = "/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/";
     /**
      * <p><code>public static final String <strong>INDEX_PATH</strong> = "indexPath"</code></p>
      * <p>Name of the setting specifying the folder beginning from the YaCy-installation's top-folder, where the

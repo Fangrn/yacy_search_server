@@ -109,7 +109,7 @@ public final class HTTPDFileHandler {
             // create htLocaleDefault, htLocalePath
 			if (htDefaultResource == null) {
 				htDefaultResource = theSwitchboard.getAppFileOrDefaultResource("htDefaultPath",
-						"/net/yacy/" + SwitchboardConstants.HTROOT_PATH_DEFAULT + "/");
+						SwitchboardConstants.HTROOT_PATH_DEFAULT_RESOURCE);
 			}
             if (htLocalePath == null) htLocalePath = theSwitchboard.getDataPath("locale.translated_html", "DATA/LOCALE/htroot");
         }
