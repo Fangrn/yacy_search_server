@@ -72,6 +72,10 @@
 			<resource>
 				<targetPath>net/yacy/htroot</targetPath>
 				<directory>source/net/yacy/htroot</directory>
+				<excludes>
+					<!-- No need to embed servlets java sources in dist jar -->
+					<exclude>**/*.java</exclude>
+				</excludes>
 			</resource>
 			<resource>
 				<targetPath>addon</targetPath>
@@ -81,19 +85,15 @@
                     <include>*.ico</include>
                </includes>  
 			</resource>
+			<resource>
+				<directory>source</directory>
+				<includes>
+					<include>log4j.properties</include>
+				</includes>
+			</resource>
 		</resources>
 
         <plugins>
-<!--             included to make htroot visible in IDE (Netbeans)
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-war-plugin</artifactId>
-                <version>2.6</version>                
-                <configuration>
-                    <warSourceDirectory>htroot</warSourceDirectory>
-                </configuration>
-            </plugin> -->
-
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -299,29 +299,6 @@
 		<id>release-jar-profile</id>
 		<build>
 			<plugins>
-				<!-- copy htroot before packaging -->
-<!-- 				<plugin>
-					<artifactId>maven-resources-plugin</artifactId>
-					<version>2.7</version>
-					<executions>
-						<execution>
-							<id>copy-resources</id>
-							<phase>prepare-package</phase>
-							<goals>
-								<goal>copy-resources</goal>
-							</goals>
-							<configuration>
-								<outputDirectory>${project.build.directory}/classes/htroot</outputDirectory>
-								<resources>
-									<resource>
-										<directory>htroot</directory>
-									</resource>
-								</resources>
-							</configuration>
-						</execution>
-					</executions>
-				</plugin> -->
-
 				<!-- specific jar configuration for all-in-one jar -->
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -345,7 +322,7 @@
 					</configuration>
 				</plugin>
 
-				<!-- Sign jar -->
+				<!-- Sign jar (alternatively, run jarsigner -keystore mycert.jks -tsa http://[timestamp_provider] yacycore-[version].jar [alias])-->
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-jarsigner-plugin</artifactId>
