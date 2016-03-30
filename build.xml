@@ -39,13 +39,13 @@
   <property name="yacyroot" location="."/>
   <property name="addon" location="addon"/>
   <property name="src" location="source"/>
+  <property name="htroot" location="source/net/yacy/htroot"/>
   <property name="data" location="DATA"/>
   <property name="lib" location="lib"/>
   <property name="libt" location="libt"/>
   <property name="libbuild" location="libbuild"/>
   <property name="build" location="classes"/>
   <property name="javadoc" location="javadoc"/>
-  <property name="htroot" location="htroot"/>
   <property name="test" location="test/java"/>
   <property name="langdetect" location="langdetect"/>
   <property name="locales" location="locales"/>
@@ -66,9 +66,9 @@
   <property name="releaseNr" value="9000" />
   
   <!-- defining all needed directory names for packing search widget-->
-  <property name="jquery" location="htroot/jquery/"/>
-  <property name="portalsearch" location="htroot/portalsearch/"/>
-  <property name="img-2" location="htroot/yacy/ui/img-2"/>
+  <property name="jquery" location="${htroot}/jquery/"/>
+  <property name="portalsearch" location="${htroot}/portalsearch/"/>
+  <property name="img-2" location="${htroot}/yacy/ui/img-2"/>
 	
 	<!-- variables for installonlinux target-->
   <property name="DESTDIR" value="DESTDIR"/>
@@ -119,7 +119,7 @@
     <filter token="REPL_DATE" value="${DSTAMP}"/>
     <filter token="REPL_RELEASE" value="${stdReleaseFile}"/>
   	
-  	<!-- YaCy Brach -->
+  	<!-- YaCy Branch -->
   	<echo message="YaCy Branch: ${branch}" />
 
     <!-- YaCy Release Version number -->
@@ -147,20 +147,31 @@
       <fileset dir="${defaults}"/>
     </copy>
   	
-    <!-- copy locales  -->
-    <copy todir="${build}/locales">
-      <fileset dir="${locales}"/>
-    </copy>
-
-    <!-- copy skins  -->
+    <!-- copy skins -->
     <copy todir="${build}/skins">
       <fileset dir="${skins}"/>
     </copy>
-
+  	
     <!-- copy language statistics files -->
     <copy todir="${build}/langdetect">
       <fileset dir="${langdetect}"/>
     </copy>
+  	
+    <!-- copy locales -->
+    <copy todir="${build}/locales">
+      <fileset dir="${locales}"/>
+    </copy>
+  	
+    <!-- copy htroot resources -->
+    <copy todir="${build}/net/yacy/htroot">
+      <fileset dir="${htroot}" excludes="**/*.java" />
+    </copy>
+  	
+    <!-- copy images -->
+    <copy todir="${build}/addon">
+      <fileset dir="${addon}" includes="*.png"/>
+      <fileset dir="${addon}" includes="*.ico"/>
+    </copy>  	
 
   </target>
 
@@ -180,7 +191,6 @@
     <!-- when changing paths here, please also update the paths in /addon/YaCy.app/Contents/Info.plist -->
     <path id="project.class.path">
         <pathelement location="${build}" />
-        <pathelement location="${htroot}" />
         <pathelement location="${lib}/apache-mime4j-0.6.jar" />
     	<pathelement location="${lib}/bcmail-jdk15-1.46.jar" />
     	<pathelement location="${lib}/bcprov-jdk15-1.46.jar" />
@@ -270,7 +280,7 @@
     	<pathelement location="${lib}/zookeeper-3.4.6.jar" />
     </path>
 
-  <target name="compile-core" depends="init" description="compile YaCy core">
+  <target name="compile" depends="init" description="compile YaCy core and servlets">
   	
     <!-- compile yacyBuildProperties.java -->
     <javac srcdir="${build}" destdir="${build}" sourcepath="${src}"
@@ -285,7 +295,7 @@
     <!-- compile the core sources -->
     <javac srcdir="${src}/" destdir="${build}"
            debug="true" debuglevel="lines,vars,source" includeantruntime="false"
-           excludes="net/yacy/peers/operation/yacyBuildProperties.java"
+           excludes="net/yacy/peers/operation/yacyBuildProperties.java, net/yacy/htroot/processing/**"
            source="${javacSource}" target="${javacTarget}" encoding="UTF-8">
       <classpath refid="project.class.path" />
       <compilerarg value="-Xlint"/>
@@ -327,17 +337,6 @@
   </target>
 
   
-  <target name="compile" depends="compile-core" description="compile YaCy core and YaCy servlets">
-    <!-- compile htroot, htroot/yacy and htroot/htdocsdefault -->
-    <javac srcdir="${htroot}/"
-    	   excludes="processing/**"
-           source="${javacSource}" target="${javacTarget}"
-           debug="true" debuglevel="lines,vars,source" includeantruntime="false" encoding="UTF-8">
-      <classpath refid="project.class.path" />
-      <compilerarg value="-Xlint"/>
-    </javac>
-  </target>
-
   <target name="all" depends="compile">
   </target>
 
@@ -448,7 +447,6 @@
            source="${javacSource}" target="${javacTarget}" encoding="UTF-8">
       <classpath>
         <pathelement location="${build}"/>
-        <pathelement location="${htroot}"/>
         <fileset dir="${libt}" includes="**/*.jar" />
         <fileset dir="${lib}" includes="**/*.jar" />
       </classpath>
@@ -467,8 +465,7 @@
       <classpath>
         <pathelement location="${test}"/>
         <pathelement location="${build}"/>
-        <pathelement location="${htroot}"/>
-	<fileset dir="${libt}" includes="**/*.jar" />
+		<fileset dir="${libt}" includes="**/*.jar" />
         <fileset dir="${lib}" includes="**/*.jar" />
       </classpath>
     </junit>
@@ -526,7 +523,6 @@
     <delete file="${libbuild}/GitRevTask.jar" failonerror="false"/>    
     <delete failonerror="false">
       <fileset dir="${src}" includes="**/*.class" />
-      <fileset dir="${htroot}" includes="**/*.class" />
       <fileset dir="test/" includes="**/*.class" />
       <fileset dir="${libbuild}/svnRevNr" includes="**/*.class" />
       <fileset dir="${libbuild}/GitRevTask" includes="**/*.class" />
@@ -646,7 +642,7 @@
 -->
     <java classname="net.yacy.yacy" fork="yes">
       <classpath>
-        <pathelement location="${build}"/>
+      	<!-- Everything needed is either in external jars or in yacycore -->
         <pathelement location="${lib}" />
         <fileset dir="${lib}" includes="**/*.jar" />
       </classpath>
@@ -665,7 +661,7 @@
     <java classname="net.yacy.yacy" fork="yes">
       <classpath refid="run.classpath"/>
       <classpath>
-        <pathelement location="${build}"/>
+      	<!-- Everything needed is either in external jars or in yacycore -->
         <pathelement location="${lib}" />
         <fileset dir="${lib}" includes="**/*.jar" />
       </classpath>
@@ -677,8 +673,7 @@
   <target name="debug" description="Debug YaCy">
     <java classname="net.yacy.yacy" fork="yes">
       <classpath>
-        <pathelement location="${build}"/>
-        <pathelement location="${htroot}"/>
+      	<!-- Everything needed is either in external jars or in yacycore -->
         <pathelement location="${lib}" />
         <fileset dir="${lib}" includes="**/*.jar" />
       </classpath>
@@ -700,7 +695,6 @@
   <target name="stop" description="Stop YaCy">
     <java classname="net.yacy.yacy" fork="yes">
       <classpath>
-        <pathelement location="${build}"/>
         <pathelement location="${lib}" />
         <fileset dir="${lib}" includes="**/*.jar" />
       </classpath>
@@ -723,10 +717,7 @@
         </fileset>
         <pathelement location="${build}"/>
       </classpath>
-      <fileset dir="source" defaultexcludes="yes">
-        <include name="**/*.java" />
-      </fileset>
-      <fileset dir="htroot" defaultexcludes="yes">
+      <fileset dir="${src}" defaultexcludes="yes">
         <include name="**/*.java" />
       </fileset>
     </javadoc>
