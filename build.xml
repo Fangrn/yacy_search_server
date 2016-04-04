@@ -476,7 +476,7 @@
        ======================================================================================================= -->
 
   <target name="dist" depends="copyMain4Dist" description="make for standard YaCy">
-    <tar destfile="${release}/${stdReleaseFile}" compression="gzip" defaultexcludes="yes" longfile="fail">
+    <tar destfile="${release}/${stdReleaseFile}" compression="gzip" defaultexcludes="yes" longfile="warn">
 
       <!-- packing all files into a gzipped tar -->
       <tarfileset dir="${release_main}" prefix="${releaseFileParentDir}/" dirmode="${accessRightsDir}" mode="${accessRightsExecutable}">
