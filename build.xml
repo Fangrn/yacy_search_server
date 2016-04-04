@@ -440,8 +440,8 @@
 
   </target>
 
-  <!-- run unittests-->
-  <target name="compileTest" depends="compile" description="run unittests">
+  <!-- compile unit tests-->
+  <target name="compileTest" depends="compile" description="compile unit tests">
 	  <javac srcdir="${test}" destdir="${test}"
            debug="true" debuglevel="lines,vars,source"
            source="${javacSource}" target="${javacTarget}" encoding="UTF-8">
@@ -454,7 +454,8 @@
     </javac>
   </target>
 
-  <target name="test" depends="compileTest" description="run some unittests">
+  <!-- run unit tests-->
+  <target name="test" depends="compileTest" description="run unit tests">
     <junit printsummary="yes" haltonfailure="no" fork="true" dir="${yacyroot}">
       <formatter type="plain"/>
       <batchtest>
