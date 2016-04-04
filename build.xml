@@ -546,28 +546,6 @@
       </fileset>
     </copy>
 
-   
-    <!-- copy locales  -->
-    <copy todir="${DESTDIR}/usr/share/yacy/locales">
-      <fileset dir="${locales}">
-        <include name="*"/>
-      </fileset>
-    </copy>
-
-    <!-- copy skins  -->
-    <copy todir="${DESTDIR}/usr/share/yacy/skins">
-      <fileset dir="${skins}">
-        <include name="*"/>
-      </fileset>
-    </copy>
-
-    <!-- copy language statistics files -->
-    <copy todir="${DESTDIR}/usr/share/yacy/langdetect">
-      <fileset dir="${langdetect}">
-        <include name="*"/>
-      </fileset>
-    </copy>
-
     <!-- copy shell scripts from bin/ -->
     <!-- i'm not sure, if this is consistent with the debian policy -->
     <!-- but for /usr/bin or /usr/lib we need an extra environment variable -->
@@ -586,18 +564,6 @@
       	<include name="AUTHORS"/>
       	<include name="COPYRIGHT"/>
       	<include name="NOTICE"/>
-      </fileset>
-    </copy>
-
-    <!-- copy server pages -->
-    <copy todir="${DESTDIR}/usr/share/yacy/htroot">
-      <fileset dir="${htroot}">
-        <include name="**/*"/>
-        <exclude name="yacy/seedUpload/**"/>
-      </fileset>
-      <fileset dir="${htroot}">
-        <include name="yacy/seedUpload/yacySeedUploadFile.html"/>
-        <include name="yacy/seedUpload/yacySeedUploadFtp.html"/>
       </fileset>
     </copy>
 
