@@ -408,13 +408,6 @@
       </fileset>
     </copy>
 
-    <!-- copy server pages -->
-    <copy todir="${release_main}/htroot">
-      <fileset dir="${htroot}">
-        <include name="**/*"/>
-      </fileset>
-    </copy>
-
     <!-- copy add-on's -->
     <copy todir="${release_main}/addon">
       <fileset dir="${addon}">
@@ -707,6 +700,7 @@
     <delete dir="${release_windows}" failonerror="false" />
   </target>
 	
+  <!-- tu run this task on debian systems, the nsis package must be installed -->	
   <target name="distWinInstaller" depends="copyMain4Dist" description="Creates an NSIS Windows installer">
     <!-- http://nsisant.sourceforge.net/ -->
     <mkdir dir="${release_windows}" />
