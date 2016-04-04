@@ -19,3 +19,4 @@ lib/yacy-cora.jar
 yacy.log
 /target/
 /javadoc/
+/doc/
