@@ -31,12 +31,14 @@
 <key>CFBundleIconFile</key>
 <string>YaCy_2013_Icon.icns</string>
 <key>JVMMainClassName</key>
-<string>net.yacy.yacy</string>
+<string>net/yacy/yacy</string>
 <key>JVMOptions</key>
 <array>
 </array>
 <key>JVMArguments</key>
 <array>
+<string>-startup</string>
+<string>YaCy</string>
 </array>
 
 </dict>
