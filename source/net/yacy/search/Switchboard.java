@@ -1886,9 +1886,8 @@ public final class Switchboard extends serverSwitch {
         // we need to take care that search requests and remote indexing requests go only
         // to the peers in the same cluster, if we run a robinson cluster.
         return (this.peers != null && this.peers.sizeConnected() == 0)
-            || (!getConfigBool(SwitchboardConstants.INDEX_DIST_ALLOW, false) && !getConfigBool(
-                SwitchboardConstants.INDEX_RECEIVE_ALLOW,
-                false));
+            || (!getConfigBool(SwitchboardConstants.INDEX_DIST_ALLOW, false) &&
+                !getConfigBool(SwitchboardConstants.INDEX_RECEIVE_ALLOW, false));
     }
 
     public boolean isPublicRobinson() {
@@ -3237,7 +3236,7 @@ public final class Switchboard extends serverSwitch {
                 searchEvent,
                 sourceName,
                 getConfigBool(SwitchboardConstants.DHT_ENABLED, false),
-                this.getConfigBool("isTransparentProxy", false) ? "http://127.0.0.1:" + sb.getConfigInt("port", 8090) : null,
+                this.getConfigBool(SwitchboardConstants.PROXY_TRANSPARENT_PROXY, false) ? "http://127.0.0.1:" + sb.getConfigInt("port", 8090) : null,
                 this.getConfig("crawler.http.acceptLanguage", null));
         final RSSFeed feed =
             EventChannel.channels(queueEntry.initiator() == null
@@ -4218,7 +4217,7 @@ public final class Switchboard extends serverSwitch {
                             if ( (ys != null)
                                 && (!peers.mySeedIsDefined() || !peers.mySeed().hash.equals(ys.hash)) ) {
                                 final long lastseen = Math.abs((System.currentTimeMillis() - ys.getLastSeenUTC()) / 1000 / 60);
-                                if ( lastseen < 60 ) {
+                                if ( lastseen < 1440 || lc < 10 ) {
                                     if ( peers.peerActions.connectPeer(ys, false) ) {
                                         lc++;
                                     }

@@ -27,10 +27,6 @@
             <outputDirectory>dictionaries</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>langstats</directory>
-            <outputDirectory>langstats</outputDirectory>
-        </fileSet>
-        <fileSet>
             <directory>ranking</directory>
             <outputDirectory>ranking</outputDirectory>
         </fileSet>

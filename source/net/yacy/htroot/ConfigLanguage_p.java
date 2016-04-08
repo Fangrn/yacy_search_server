@@ -1,43 +1,12 @@
 package net.yacy.htroot;
 
-//ConfigLanguage_p.java
-//-----------------------
-//part of YACY
-//(C) by Michael Peter Christen; mc@yacy.net
-//first published on http://www.anomic.de
-//Frankfurt, Germany, 2004
-
-//This File is contributed by Alexander Schier
-//
-//$LastChangedDate$
-//$LastChangedRevision$
-//$LastChangedBy$
-//
-//This program is free software; you can redistribute it and/or modify
-//it under the terms of the GNU General Public License as published by
-//the Free Software Foundation; either version 2 of the License, or
-//(at your option) any later version.
-
-//This program is distributed in the hope that it will be useful,
-//but WITHOUT ANY WARRANTY; without even the implied warranty of
-//MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//GNU General Public License for more details.
-
-//You should have received a copy of the GNU General Public License
-//along with this program; if not, write to the Free Software
-//Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-
-//You must compile this file with
-//javac -classpath .:../Classes Blacklist_p.java
-//if the shell's current path is HTROOT
-
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.OutputStreamWriter;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -113,28 +82,27 @@ public class ConfigLanguage_p {
                 try {
                     final DigestURL u = new DigestURL(url);
                     it = FileUtils.strings(u.get(ClientIdentification.yacyInternetCrawlerAgent, null, null));
+                	try {
+                    	final File langFile = new File(new File(langPathURL.toURI()), url.substring(url.lastIndexOf('/'), url.length()));
+                    	final OutputStreamWriter bw = new OutputStreamWriter(new FileOutputStream(langFile), StandardCharsets.UTF_8.name());
+
+                    	while (it.hasNext()) {
+                        	bw.write(it.next() + "\n");
+                    	}
+                    	bw.close();
+                		if (post.containsKey("use_lang") && "on".equals(post.get("use_lang"))) {
+                    		Translator.changeLang(env, langPathURL, url.substring(url.lastIndexOf('/'), url.length()));
+                		}
+                	} catch(final IOException e) {
+                    	prop.put("status", "2");//error saving the language file
+                    	return prop;
+                	} catch (URISyntaxException e) {
+                    	prop.put("status", "2");//error saving the language file
+                    	return prop;
+					}
                 } catch(final IOException e) {
                     prop.put("status", "1");//unable to get url
                     prop.put("status_url", url);
-                    return prop;
-                }
-                try {
-                    final File langFile = new File(new File(langPathURL.toURI()), url.substring(url.lastIndexOf('/'), url.length()));
-                    final BufferedWriter bw = new BufferedWriter(new PrintWriter(new FileWriter(langFile)));
-
-                    while (it.hasNext()) {
-                        bw.write(it.next() + "\n");
-                    }
-                    bw.close();
-                } catch(final IOException e) {
-                    prop.put("status", "2");//error saving the language file
-                    return prop;
-                } catch (URISyntaxException e) {
-                    prop.put("status", "2");//error saving the language file
-                    return prop;
-				}
-                if (post.containsKey("use_lang") && "on".equals(post.get("use_lang"))) {
-                    Translator.changeLang(env, langPathURL, url.substring(url.lastIndexOf('/'), url.length()));
                 }
             }
         }

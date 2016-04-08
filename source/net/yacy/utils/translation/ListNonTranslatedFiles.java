@@ -26,9 +26,8 @@
 package net.yacy.utils.translation;
 
 import java.io.File;
-import java.io.FilenameFilter;
 import java.net.MalformedURLException;
-import java.nio.file.Path;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -36,7 +35,7 @@ import java.util.Set;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.data.ListManager;
 import net.yacy.data.Translator;
-import net.yacy.kelondro.util.FileUtils;
+import net.yacy.kelondro.util.ResourceUtils;
 
 /**
  * Util to help identifying non translated files.
@@ -50,9 +49,9 @@ public class ListNonTranslatedFiles extends TranslatorUtil {
 	 * Print on standard output result of search
 	 * @param nonTranslatedFiles list of non translated files
 	 */
-	private static void printResults(List<File> nonTranslatedFiles) {
+	private static void printResults(List<URL> nonTranslatedFiles) {
 		System.out.println(nonTranslatedFiles.size() + " files are not translated.");
-		for(File file : nonTranslatedFiles) {
+		for(URL file : nonTranslatedFiles) {
 			System.out.println(file);
 		}
 	}
@@ -72,15 +71,13 @@ public class ListNonTranslatedFiles extends TranslatorUtil {
 	 * @throws MalformedURLException when source dir path is not valid
 	 */
 	public static void main(String args[]) throws MalformedURLException {
-		File sourceDir = getSourceDir(args, 0);
-		Path sourcePath = sourceDir.toPath();
+		URL sourceDir = getSourceDirURL(args, 0);
 
 		File translationFile = getTranslationFile(args, 1);
 
 		List<String> extensions = ListManager
 				.string2vector(getExtensions(args, 2));
 		
-		FilenameFilter fileFilter = new ExtensionsFileFilter(extensions);
 
 		String excludedDir = "locale";
 
@@ -91,15 +88,26 @@ public class ListNonTranslatedFiles extends TranslatorUtil {
 		try {
 			Set<String> translatedRelativePaths = Translator.loadTranslationsLists(translationFile.toURI().toURL()).keySet();
 
-			List<File> srcFiles = FileUtils.getFilesRecursive(sourceDir, excludedDir, fileFilter);
+			List<URL> nonTranslatedFiles = new ArrayList<>();
 			
-			List<File> nonTranslatedFiles = new ArrayList<>();
-			for(File srcFile : srcFiles) {
-				Path relativeSrcFile = sourcePath.relativize(srcFile.toPath());
-				if(!translatedRelativePaths.contains(relativeSrcFile.toString())) {
-					nonTranslatedFiles.add(srcFile);
+	    	final List<URL> dirList = ResourceUtils.listRecursiveDirectories(sourceDir, excludedDir);
+	        dirList.add(sourceDir);
+	        int sourceDirURLLength = sourceDir.toExternalForm().length();
+			for (final URL childSourceDir : dirList) {
+				List<URL> srcFileURLs = ResourceUtils.listFileResources(childSourceDir);
+				for(URL srcFileURL : srcFileURLs) {
+					String relativePath = srcFileURL.toExternalForm().substring(sourceDirURLLength);					
+					for(String ext: extensions) {
+						if(relativePath.endsWith(ext)) {
+		                    if (!translatedRelativePaths.contains(relativePath)) {
+		                        nonTranslatedFiles.add(srcFileURL);
+		                    }
+		                    break;
+						}
+					}
 				}
 			}
+
 			
 			printResults(nonTranslatedFiles);
 

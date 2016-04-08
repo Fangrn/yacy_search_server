@@ -27,6 +27,7 @@ package net.yacy.utils.translation;
 
 import java.io.File;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -56,7 +57,7 @@ public class TranslateAll extends TranslatorUtil {
 	 *            </ul>
 	 */
 	public static void main(String args[]) {
-		File sourceDir = getSourceDir(args, 0);
+		URL sourceDir = getSourceDirURL(args, 0);
 
 		File destDir = getDestDir(args);
 
@@ -88,7 +89,7 @@ public class TranslateAll extends TranslatorUtil {
 					localeDestDir.mkdirs();
 
 					try {
-						Translator.translateFilesRecursive(sourceDir.getAbsoluteFile().toURI().toURL(), localeDestDir,
+						Translator.translateFilesRecursive(sourceDir, localeDestDir,
 								translationFile.toURI().toURL(), extensions, "locale");
 					} catch (MalformedURLException e) {
 						e.printStackTrace();

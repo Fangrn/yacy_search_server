@@ -7,7 +7,7 @@
     <version>1.83</version>
     <packaging>jar</packaging>
     <description>YaCy - a Peer to Peer Web Search Engine</description>
-    <name>YaCy</name>
+    <name>YaCy Search Server</name>
     <url>http://www.yacy.net</url>
     <issueManagement>
         <system>YaCy Bugtracker</system>
@@ -34,7 +34,7 @@
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
         <!-- the Solr version used in dependency section for all related dependencies -->
-        <solr.version>5.4.1</solr.version> 
+        <solr.version>5.5.0</solr.version> 
         <!-- the Jetty version used in dependency section for all related dependencies -->
         <jetty.version>9.2.15.v20160210</jetty.version>
                 
@@ -508,7 +508,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
-            <version>4.5.1</version>
+            <version>4.5.2</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
@@ -518,7 +518,7 @@
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpmime</artifactId>
-            <version>4.5.1</version>
+            <version>4.5.2</version>
         </dependency>
         <dependency>
             <groupId>com.ibm.icu</groupId>
@@ -553,7 +553,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>jcl-over-slf4j</artifactId>
-            <version>1.7.16</version>
+            <version>1.7.18</version>
         </dependency>
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
@@ -583,7 +583,7 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>log4j-over-slf4j</artifactId>
-            <version>1.7.16</version>
+            <version>1.7.18</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene</groupId>
@@ -608,28 +608,18 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
-            <version>3.13</version>
+            <version>3.14</version>
         </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-scratchpad</artifactId>
-            <version>3.13</version>
+            <version>3.14</version>
         </dependency>
         <dependency>
             <groupId>sax</groupId>
             <artifactId>sax</artifactId>
             <version>2.0.1</version>
         </dependency>        
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.16</version>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-jdk14</artifactId>
-            <version>1.7.16</version>
-        </dependency>
         <dependency>
             <groupId>org.apache.solr</groupId>
             <artifactId>solr-solrj</artifactId>
@@ -706,6 +696,11 @@
             <version>${jetty.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>1.7.18</version>
+        </dependency>
+        <dependency>
             <groupId>pt.tumba</groupId>
             <artifactId>webcat-swf</artifactId>
             <version>0.1</version>
@@ -720,6 +715,11 @@
             <artifactId>xercesImpl</artifactId>
             <version>2.11.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.collaborne</groupId>
+            <artifactId>xliff-core-1.2</artifactId>
+            <version>1.1</version>
+        </dependency>        
         <dependency>
             <groupId>com.adobe.xmp</groupId>
             <artifactId>xmpcore</artifactId>

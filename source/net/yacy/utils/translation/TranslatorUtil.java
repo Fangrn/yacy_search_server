@@ -26,10 +26,13 @@
 package net.yacy.utils.translation;
 
 import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Locale;
 
 import net.yacy.yacy;
 import net.yacy.data.Translator;
+import net.yacy.search.SwitchboardConstants;
 
 /**
  * Base class for launching a {@link Translator} method without full YaCy
@@ -49,20 +52,21 @@ public abstract class TranslatorUtil {
 	 * @throws IllegalArgumentException
 	 *             when no parameters is set and default is not found
 	 */
-	protected static File getSourceDir(String[] args, int argIndex) {
-		File sourceDir;
+	protected static URL getSourceDirURL(String[] args, int argIndex) {
+		URL sourceDir;
 		if (args.length > argIndex && argIndex >= 0) {
-			sourceDir = new File(args[argIndex]);
-		} else {
-			String workingDir = System.getProperty("user.dir");
-			if (workingDir == null) {
+			try {
+				sourceDir = new File(args[argIndex]).getAbsoluteFile().toURI().toURL();
+			} catch (MalformedURLException e) {
 				throw new IllegalArgumentException(
-						"No translation file specified, and default not found");
+						"Wrong path for sources directory : "
+								+ args[argIndex]);
 			}
-			sourceDir = new File(workingDir, "htroot");
-			if (!sourceDir.exists() && !sourceDir.isDirectory()) {
+		} else {
+			sourceDir = TranslatorUtil.class.getResource(SwitchboardConstants.HTROOT_PATH_DEFAULT_RESOURCE);
+			if (sourceDir == null) {
 				throw new IllegalArgumentException(
-						"No translation file specified, and default not found : "
+						"No sources directory specified, and default not found : "
 								+ sourceDir.getPath());
 			}
 		}
