@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE jnlp PUBLIC "-//Sun Microsystems, Inc//DTD JNLP Descriptor 6.0//EN" "http://java.sun.com/dtd/JNLP-6.0.dtd">
-<jnlp spec="6.0+" href="yacy.jnlp" codebase="http://luccioman.github.io/yacy_search_server/" version="1.83-9730">
+<jnlp spec="6.0+" href="yacy.jnlp" codebase="http://luccioman.github.io/yacy_search_server/" version="1.83-9799">
     <information>
         <title>YaCy</title>
         <vendor>YaCy</vendor> 
@@ -22,7 +22,7 @@
     </security>
     <resources>
         <j2se version="1.7+"/>
-        <jar href="yacycore-1.83-9730.jar" size="81504511"/>
+        <jar href="yacycore-1.83-9799.jar" size="81830830"/>
     </resources>
     <application-desc main-class="net.yacy.yacy">
     	<argument>-startup</argument>
