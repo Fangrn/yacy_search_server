@@ -622,7 +622,6 @@ Parser Configuration==Настройка обробника
 Content Parser Settings==Налаштування обробника вмісту
 With this settings you can activate or deactivate parsing of additional content-types based on their MIME-types.==З допомогою цих настройок можна вмикати і вимикати обробку додаткових типів даних на основі їхніх MIME-типів.
 For a detailed description of the various MIME-types take a look at==Для докладного опису різних типів MIME дивіться
-http://www.iana.org/assignments/media-types/</a>==https://www.iana.org/assignments/media-types/</a>
 If you want to test a specific parser you can do so using the <a href="ViewFile.html">File Viewer</a>==Якщо потрібно перевірити незвичайний аналізатор, це можна зробити з допомогою <a href="ViewFile.html">переглядача файлів</a>
 enable/disable Parser==Ввім./Вимк. обробник
 # --- Parser Names are hard-coded BEGIN ---
@@ -4161,6 +4160,8 @@ Select tags to remove ...==Ключі для видалення ...
 
 #File: ServerScannerList.html
 #---------------------------
+Network Scanner Monitor==Результати сканування мережі
+The following servers can be searched:==По наступних серверах можна здійснювати пошук:
 The following servers had been detected:==Були виявлені наступні сервери:
 Available server within the given IP range==Доступні сервери в межах вказаної IP-області
 >Protocol<==>Протокол<
@@ -4175,8 +4176,6 @@ Available server within the given IP range==Доступні сервери в �
 >not in index<==>не в індексі<
 >indexed<==>проіндексовано<
 "Add Selected Servers to Crawler"=="Додати обрані сервери у сканування"
-The following servers can be searched:==По наступних серверах можна здійснювати пошук:
-Network Scanner Monitor==Результати сканування мережі
 #-----------------------------
 
 #File: env/templates/submenuComputation.template

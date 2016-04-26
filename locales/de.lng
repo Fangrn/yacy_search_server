@@ -102,7 +102,6 @@ With this settings you can activate or deactivate augmented browsing which happe
 Augmented Browsing:==Angereichertes Browsing:
 #>Enabled<==>Aktiviert<
 Enables or disables augmented browsing. If enabled, all websites will be modified during loading.==Schaltet angereichertes Browsing an oder ab. Wenn aktiviert werden alle Webseite während des Ladens modifiziert.
-#"Submit"=="Absenden"
 #-----------------------------
 
 #File: Blacklist_p.html
@@ -383,7 +382,6 @@ Save User==Benutzer speichern
 #---------------------------
 Appearance and Integration==Erscheinungsbild und Integration
 You can change the appearance of the YaCy interface with skins.==Sie können hier das Aussehen der YaCy Oberfläche mit Skins verändern,
-#You can change the appearance of YaCy with skins==Sie können hier das Erscheinungsbild von YaCy mit Skins ändern
 The selected skin and language also affects the appearance of the search page.==das ausgewählte Design und die gewählte Sprache wirken sich auch auf das Erscheinungsbild der Suchseite aus.
 If you <a href="ConfigPortal.html">create a search portal with YaCy</a> then you can==Wenn Sie <a href="ConfigPortal.html">ein Such-Portal mit Yacy erstellen möchten</a> können Sie
 change the appearance of the search page here.==das Erscheinungsbild der Suchseite <a href="ConfigPortal.html">hier</a> weitgehend ändern und die standard Grafiken und Links auf der Suchseite durch Ihre eigenen ersetzen.
@@ -498,7 +496,6 @@ opensearch load external search result list from active systems below==Lade exte
 When using this heuristic, then every new search request line is used for a call to listed opensearch systems.==Wenn diese Heuristik genutzt wird, dann wird jede neue Suchanfragezeile für einen Aufruf der aufgelisteten OpenSearch Systeme verwendet.
 20 results are taken from remote system and loaded simultanously, parsed and indexed immediately.==20 Resultate werden vom remote System genommen und simultan geladen, geparsed und sofort indexiert.
 To find out more about OpenSearch see==Um mehr über OpenSearch zu erfahren besuche
-#>OpenSearch.org<==>OpenSearch.org<
 Available/Active Opensearch System==Verfügbare/Aktive OpenSearch Systeme
 >Active<==>Aktiv<
 >Title<==>Titel<
@@ -549,6 +546,7 @@ Current language</label>==Aktuelle Sprache</label>
 Author(s) (chronological)</label>==Autoren (chronologisch)</label>
 Send additions to maintainer</em>==Schicken Sie Ergänzungen bitte an</em>
 Available Languages</label>==Verfügbare Sprachen</label>
+Supported formats are the internal language file (extension .lng) or XLIFF (extension .xlf) format.==Unterstütztes Format ist das interne Sprachdatei (Dateiendung .lng) oder XLIFF (Dateiendung .xlf) Format.
 Install new language from URL==Neue Sprachdatei herunterladen
 Use this language==Diese Sprachdatei sofort benutzen
 "Use"=="Benutzen"
@@ -633,7 +631,7 @@ YaCy can operate a computing grid of YaCy peers or as a stand-alone node.==Sie k
 To control that all participants within a web indexing domain have access to the same domain,==Um zu kontrollieren, dass alle Teilnehmer innerhalb einer Indexierungs Domain Zugriff zu der selben Domain haben, 
 this network definition must be equal to all members of the same YaCy network.==müssen diese Netzwerkdefinitionen bei allen Mitgliedern des YaCy Netzwerkes gleich sein.
 Network Definition==Netzwerk Definition
-Network Nick==Netzwerk Nick
+Network Nick==Netzwerk Name
 Long Description==Lange Beschreibung
 Indexing Domain==Indexierungs Domain
 #DHT==DHT
@@ -1069,9 +1067,7 @@ Load<==Auslastung<
 >Scheduled Crawls can be modified in this table<==>Geplante Crawls können in dieser Tabelle geändert werden<
 Crawl profiles hold information about a crawl process that is currently ongoing.==Crawl Profile beinhalten Informationen über einen Crawl Prozess der gerade ausgeführt wird.
 
-#Crawl profiles hold information about a specific URL which is internally used to perform the crawl it belongs to.==Crawl Profile enthalten Informationen über eine spezifische URL, welche intern genutzt wird, um nachzuvollziehen, wozu der Crawl gehört.
 #The profiles for remote crawls, <a href="ProxyIndexingMonitor_p.html">indexing via proxy</a> and snippet fetches==Die Profile für Remote Crawl, <a href="ProxyIndexingMonitor_p.html">Indexierung per Proxy</a> und Snippet Abrufe
-#cannot be altered here as they are hard-coded.==können nicht verändert werden, weil sie "hard-coded" sind.
 Crawl Profile List==Crawl Profil Liste
 Crawl Thread==Crawl Art
 #Status==Status
@@ -1368,20 +1364,6 @@ Look every==Überprüfe alle
 again and add new sites automatically to indexer.==wieder und füge neue Seiten automatisch zum Indexer hinzu.
 Sites that do not appear during a scheduled scan period will be excluded from search results.==Seiten die nicht im Laufe eines geplanten Scans auftauchen werden von den Suchergebnissen ausgeschlossen.
 "Scan"=="Scannen"
-#The following servers had been detected:==Die folgenden Server wurden entdeckt:
-#Available server within the given IP range==Verfügbare Server innerhalb des angegebenen IP Bereichs
-#>Protocol<==>Protokoll<
-#>IP<==>IP<
-#>URL<==>URL<
-#>Access<==>Zugriff<
-#>Process<==>Prozess<
-#>unknown<==>unbekannt<
-#>empty<==>leer<
-#>granted<==>erlaubt<
-#>denied<==>verweigert<
-#>not in index<==>nicht im Index<
-#>indexed<==>indexiert<
-#"Add Selected Servers to Crawler"=="Füge ausgewählte Server zum Crawlen hinzu"
 #-----------------------------
 
 #File: CrawlStartSite.html
@@ -2809,6 +2791,25 @@ If the remote crawl option is switched on, then this peer will load URLs from th
 >Age<==>Alter<
 #-----------------------------
 
+#File: ServerScannerList.html
+#------------------------------
+#Network Scanner Monitor==Network Scanner Monitor
+The following servers can be searched:==Die folgenden Server können durchsucht werden:
+Available server within the given IP range==Verfügbare Server innerhalb des angegebenen IP Bereichs
+>Protocol<==>Protokoll<
+#IP=IP
+#URL==URL
+>Access<==>Zugriff<
+>Process<==>Prozess<
+>inaccessible<==>unbekannt<
+>empty<==>leer<
+>granted<==>erlaubt<
+>denied<==>verweigert<
+>not in index<==>nicht im Index<
+>indexed<==>indexiert<
+"Add Selected Servers to Crawler"=="Füge ausgewählte Server zum Crawlen hinzu"
+#------------------------------
+
 #File: Settings_p.html
 #---------------------------
 Advanced Settings==Erweiterte Einstellungen
@@ -3772,6 +3773,7 @@ Table Viewer==Tabellen Betrachter
 
 #File: api/yacydoc.html
 #---------------------------
+>Title<==>Titel<
 >Author<==>Autor<
 >Description<==>Beschreibung<
 >Subject<==>Betreff<

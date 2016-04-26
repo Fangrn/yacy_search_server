@@ -54,6 +54,7 @@ import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.kelondro.util.FileUtils;
 import net.yacy.kelondro.util.Formatter;
 import net.yacy.kelondro.util.ResourceUtils;
+import net.yacy.peers.Seed;
 import net.yacy.search.SwitchboardConstants;
 import net.yacy.server.serverSwitch;
 
@@ -255,6 +256,10 @@ public class Translator {
         return true;
     }
 
+    /**
+     * @param env configuration
+     * @return a map of language names indexed by two letters language codes
+     */
     public static Map<String, String> langMap(@SuppressWarnings("unused") final serverSwitch env) {
         final String[] ms = CommonPattern.COMMA.split(
             "default/English,de/Deutsch,fr/Fran&ccedil;ais,nl/Nederlands,it/Italiano,es/Espa&ntilde;ol,pt/Portug&ecirc;s,fi/Suomi,se/Svenska,dk/Dansk," +
@@ -295,7 +300,7 @@ public class Translator {
 					BufferedWriter bw = null;
 					try {
 						bw = new BufferedWriter(new PrintWriter(new FileWriter(new File(destDir, "version"))));
-						bw.write(env.getConfig("svnRevision", "Error getting Version"));
+						bw.write(env.getConfig(Seed.VERSION, "Error getting Version"));
 						bw.close();
 					} catch (final IOException e) {
 						ConcurrentLog.warn("TRANSLATOR", "Could write svnRevision");

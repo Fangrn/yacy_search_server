@@ -277,6 +277,8 @@ public class ConfigBasic {
         prop.put("defaultPort", env.getLocalPort());
         prop.put("withsslenabled", env.getConfigBool("server.https", false) ? 1 : 0);
         lang = env.getConfig("locale.language", "default"); // re-assign lang, may have changed
+        
+        // TODO this list should be dynamically filled with available language files, from both "/locales" classpath resource and DATA/LOCALE 
         prop.put("lang_de", "0");
         prop.put("lang_fr", "0");
         prop.put("lang_cn", "0");
