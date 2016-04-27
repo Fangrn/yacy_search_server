@@ -27,10 +27,6 @@
             <outputDirectory>dictionaries</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>ranking</directory>
-            <outputDirectory>ranking</outputDirectory>
-        </fileSet>
-        <fileSet>
             <directory>vocabularies</directory>
             <outputDirectory>vocabularies</outputDirectory>
         </fileSet>
