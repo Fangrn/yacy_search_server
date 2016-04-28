@@ -186,7 +186,6 @@ public final class transferRWI {
             byte[] urlHash;
             WordReferenceRow iEntry;
             final HandleSet unknownURL = new RowHandleSet(Word.commonHashLength, Word.commonHashOrder, 0);
-            final HandleSet knownURL = new RowHandleSet(Word.commonHashLength, Word.commonHashOrder, 0);
             final ArrayList<String> wordhashes = new ArrayList<String>();
             int received = 0;
             int blocked = 0;
@@ -238,9 +237,7 @@ public final class transferRWI {
             for (String id: testids) {
                 try {
                     try {
-                        if (sb.index.fulltext().getLoadTime(id) >= 0) {
-                            knownURL.put(ASCII.getBytes(id));
-                        } else {
+                        if (sb.index.fulltext().getLoadTime(id) < 0) {
                             unknownURL.put(ASCII.getBytes(id));
                         }
                     } catch (IOException e) {
