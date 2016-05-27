@@ -54,9 +54,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 import org.mozilla.intl.chardet.nsDetector;
@@ -65,6 +63,8 @@ import org.mozilla.intl.chardet.nsPSMDetector;
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.storage.Files;
 import net.yacy.cora.util.ConcurrentLog;
+
+import org.apache.commons.lang.StringUtils;
 
 public final class FileUtils {
 
@@ -475,11 +475,10 @@ public final class FileUtils {
         return mb;
     }
 
-    private final static Pattern backslashbackslash = Pattern.compile("\\\\");
-    private final static Pattern unescaped_equal = Pattern.compile("=");
-    private final static Pattern escaped_equal = Pattern.compile("\\=", Pattern.LITERAL);
-    private final static Pattern escaped_newline = Pattern.compile("\\n", Pattern.LITERAL);
-    private final static Pattern escaped_backslash = Pattern.compile(Pattern.quote("\\"), Pattern.LITERAL);
+    private final static String[] unescaped_strings_in = {"\r\n", "\r", "\n", "=", "\\"};
+    private final static String[] escaped_strings_out = {"\\n", "\\n", "\\n", "\\=", "\\\\"};
+    private final static String[] escaped_strings_in = {"\\\\", "\\n", "\\="};
+    private final static String[] unescaped_strings_out = {"\\", "\n", "="};
 
     public static void saveMap(final File file, final Map<String, String> props, final String comment) {
     	boolean err = false;
@@ -492,16 +491,13 @@ public final class FileUtils {
             for ( final Map.Entry<String, String> entry : props.entrySet() ) {
                 key = entry.getKey();
                 if ( key != null ) {
-                    key = backslashbackslash.matcher(key).replaceAll("\\\\");
-                    key = escaped_newline.matcher(key).replaceAll("\\n");
-                    key = unescaped_equal.matcher(key).replaceAll("\\=");
+                    key = StringUtils.replaceEach(key, unescaped_strings_in, escaped_strings_out);
                 }
                 if ( entry.getValue() == null ) {
                     value = "";
                 } else {
                     value = entry.getValue();
-                    value = backslashbackslash.matcher(value).replaceAll("\\\\");
-                    value = escaped_newline.matcher(value).replaceAll("\\n");
+                    value = StringUtils.replaceEach(value, unescaped_strings_in, escaped_strings_out);
                 }
                 pw.println(key + "=" + value);
             }
@@ -550,11 +546,8 @@ public final class FileUtils {
                 pos = line.indexOf('=', pos + 1);
             } while ( pos > 0 && line.charAt(pos - 1) == '\\' );
             if ( pos > 0 ) try {
-                String key = escaped_equal.matcher(line.substring(0, pos).trim()).replaceAll("=");
-                key = escaped_newline.matcher(key).replaceAll("\n");
-                key = escaped_backslash.matcher(key).replaceAll("\\");
-                String value = escaped_newline.matcher(line.substring(pos + 1).trim()).replaceAll("\n");
-                value = value.replace("\\\\", "\\"); // does not work: escaped_backslashbackslash.matcher(value).replaceAll("\\");
+                String key = StringUtils.replaceEach(line.substring(0, pos).trim(), escaped_strings_in, unescaped_strings_out);
+                String value = StringUtils.replaceEach(line.substring(pos + 1).trim(), escaped_strings_in, unescaped_strings_out);
                 //System.out.println("key = " + key + ", value = " + value);
                 props.put(key, value);
             } catch (final IndexOutOfBoundsException e) {
@@ -1035,31 +1028,29 @@ public final class FileUtils {
      * used code from http://jchardet.sourceforge.net/;
      * see also: http://www-archive.mozilla.org/projects/intl/chardet.html
      * @param file
-     * @return a set of probable charsets
+     * @return a list of probable charsets
      * @throws IOException
      */
-    public static Set<String> detectCharset(File file) throws IOException {
+    public static List<String> detectCharset(File file) throws IOException {
         // auto-detect charset, used code from http://jchardet.sourceforge.net/; see also: http://www-archive.mozilla.org/projects/intl/chardet.html
-        nsDetector det = new nsDetector(nsPSMDetector.ALL);
-        BufferedInputStream imp = new BufferedInputStream(new FileInputStream(file));
-
-        byte[] buf = new byte[1024] ;
-        int len;
-        boolean done = false ;
-        boolean isAscii = true ;
-
-        while ((len = imp.read(buf,0,buf.length)) != -1) {
-            if (isAscii) isAscii = det.isAscii(buf,len);
-            if (!isAscii && !done) done = det.DoIt(buf,len, false);
+        List<String> result;
+        try (BufferedInputStream imp = new BufferedInputStream(new FileInputStream(file))) { // try-with-resource to close inputstream
+            nsDetector det = new nsDetector(nsPSMDetector.ALL);
+            byte[] buf = new byte[1024] ;
+            int len;
+            boolean done = false ;
+            boolean isAscii = true ;
+            while ((len = imp.read(buf,0,buf.length)) != -1) {
+                if (isAscii) isAscii = det.isAscii(buf,len);
+                if (!isAscii && !done) done = det.DoIt(buf,len, false);
+            }   det.DataEnd();
+            result = new ArrayList<>();
+            if (isAscii) {
+                result.add(StandardCharsets.US_ASCII.name());
+            } else {
+                for (String c: det.getProbableCharsets()) result.add(c); // worst case this returns "nomatch"
+            }
         }
-        det.DataEnd();
-        Set<String> result = new HashSet<>();
-        if (isAscii) {
-            result.add("ASCII");
-        } else {
-            for (String c: det.getProbableCharsets()) result.add(c);
-        }
-
         return result;
     }
     
@@ -1076,7 +1067,7 @@ public final class FileUtils {
             @Override
             public void run() {
                 try {
-                    Set<String> charsets = FileUtils.detectCharset(file);
+                    List<String> charsets = FileUtils.detectCharset(file);
                     if (charsets.contains(givenCharset)) {
                         ConcurrentLog.info("checkCharset", "appropriate charset '" + givenCharset + "' for import of " + file + ", is part one detected " + charsets);
                     } else {

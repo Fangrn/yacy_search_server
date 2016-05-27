@@ -286,7 +286,7 @@ public final class Switchboard extends serverSwitch {
     public List<Pattern> networkWhitelist, networkBlacklist;
     public FilterEngine domainList;
     private Dispatcher dhtDispatcher;
-    public LinkedBlockingQueue<String> trail;
+    public LinkedBlockingQueue<String> trail; // connect infos from cytag servlet
     public SeedDB peers;
     public WorkTables tables;
     public Tray tray;
@@ -548,6 +548,7 @@ public final class Switchboard extends serverSwitch {
                 bf.equals("scale(cr_host_norm_i,1,20)")) bf = "";
             if (bf.equals("recip(rord(last_modified),1,1000,1000))")) bf = "recip(ms(NOW,last_modified),3.16e-11,1,1)"; // that was an outdated date boost that did not work well
             if (i == 0 && bq.equals("fuzzy_signature_unique_b:true^100000.0")) bq = "crawldepth_i:0^0.8 crawldepth_i:1^0.4";
+            if (bq.equals("crawldepth_i:0^0.8 crawldepth_i:1^0.4")) bq = "crawldepth_i:0^0.8\ncrawldepth_i:1^0.4"; // Fix issue with multiple Boost Queries
             if (boosts.equals("url_paths_sxt^1000.0,synonyms_sxt^1.0,title^10000.0,text_t^2.0,h1_txt^1000.0,h2_txt^100.0,host_organization_s^100000.0")) boosts = "url_paths_sxt^3.0,synonyms_sxt^0.5,title^5.0,text_t^1.0,host_s^6.0,h1_txt^5.0,url_file_name_tokens_t^4.0,h2_txt^2.0";
             r.setName(name);
             r.updateBoosts(boosts);
@@ -2378,10 +2379,6 @@ public final class Switchboard extends serverSwitch {
         }
         return false;
     }
-
-    public void searchresultFreeMem() {
-        // do nothing
-    }
     
     public static void clearCaches() {
         // flush caches in used libraries
@@ -2754,20 +2751,6 @@ public final class Switchboard extends serverSwitch {
                 boolean postprocessing = process_key_exist && reference_index_exist && minimum_ram_fullfilled && minimum_load_fullfilled;
                 if (!postprocessing) log.info("postprocessing deactivated: constraints violated");
 
-                // Hack to prevent Solr problem on partial update if target document contains multivalued date field
-                // regardless if this field is part of the update it causes a org.apache.solr.common.SolrException: Invalid Date String Exception.
-                // 2015-09-12 Solr v5.2.1 & v5.3
-                // this hack switches partial update off (if multivalued datefield _dts exists, like: dates_in_content_dts startDates_dts endDates_dts)
-                boolean partialUpdate = getConfigBool("postprocessing.partialUpdate", true);
-
-                /* Solr 5.4.0 bugfix see http://issues.apache.org/jira/browse/SOLR-8050 Partial update on document with multivalued date field fails
-                *
-                for (String sf : index.fulltext().getDefaultConfiguration().keySet()) {
-                    if (sf.endsWith("_dts")) {
-                        partialUpdate = false;
-                    }
-                }
-                */
                 if (allCrawlsFinished) {
                     // refresh the search cache
                     SearchEventCache.cleanupEvents(true);
@@ -2776,7 +2759,7 @@ public final class Switchboard extends serverSwitch {
                     if (postprocessing) {
                         // run postprocessing on all profiles
                         ReferenceReportCache rrCache = index.getReferenceReportCache();
-                        proccount += collection1Configuration.postprocessing(index, rrCache, null, partialUpdate);
+                        proccount += collection1Configuration.postprocessing(index, rrCache, null, getConfigBool("postprocessing.partialUpdate", true));
                         this.index.fulltext().commit(true); // without a commit the success is not visible in the monitoring
                     }
                     this.crawler.cleanProfiles(this.crawler.getActiveProfiles());
@@ -2789,7 +2772,7 @@ public final class Switchboard extends serverSwitch {
                         if (postprocessing) {
                             // run postprocessing on these profiles
                             ReferenceReportCache rrCache = index.getReferenceReportCache();
-                            for (String profileHash: deletionCandidates) proccount += collection1Configuration.postprocessing(index, rrCache, profileHash, partialUpdate);
+                            for (String profileHash: deletionCandidates) proccount += collection1Configuration.postprocessing(index, rrCache, profileHash, getConfigBool("postprocessing.partialUpdate", true));
                             this.index.fulltext().commit(true); // without a commit the success is not visible in the monitoring
                         }
                         this.crawler.cleanProfiles(deletionCandidates);

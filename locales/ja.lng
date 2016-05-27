@@ -825,11 +825,12 @@ load only files in a sub-path of given url==与えられたURLのサブ-パス�
 #---------------------------
 #YaCy: Help==YaCy: ヘルプ
 YaCy: Tutorial==YaCy: チュートリアル
+>Tutorial==>チュートリアル
 #-----------------------------
 
 #File: HostBrowser.html
 #---------------------------
-#Index Browser==索引ブラウザー
+Index Browser==索引ブラウザー
 #Administration Options==管理オプション
 #-----------------------------
 
@@ -1583,6 +1584,7 @@ Local Search<==ローカル検索<
 #Log==ログ
 Host Tracker==ホスト トラッカー
 Remote Search<==リモート検索<
+Cookie Menu==Cookie メニュー
 #-----------------------------
 
 #File: env/templates/submenuBlacklist.template
@@ -1641,11 +1643,6 @@ Advanced Properties==高度な属性
 #File: env/templates/submenuContentIntegration.template
 #---------------------------
 External Content Integration==外部コンテントの統合
-#-----------------------------
-
-#File: env/templates/submenuCookie.template
-#---------------------------
-Cookie Menu==Cookie メニュー
 #-----------------------------
 
 #File: env/templates/submenuCrawler.template

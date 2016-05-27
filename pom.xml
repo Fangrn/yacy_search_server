@@ -34,9 +34,9 @@
         <maven.compiler.source>1.7</maven.compiler.source>
         <maven.compiler.target>1.7</maven.compiler.target>
         <!-- the Solr version used in dependency section for all related dependencies -->
-        <solr.version>5.5.0</solr.version> 
+        <solr.version>5.5.1</solr.version> 
         <!-- the Jetty version used in dependency section for all related dependencies -->
-        <jetty.version>9.2.15.v20160210</jetty.version>
+        <jetty.version>9.2.16.v20160414</jetty.version>
                 
         <!-- properties used for filtering yacyBuildProperties.java -->       
         <REPL_DATE>${DSTAMP}</REPL_DATE>
@@ -97,7 +97,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.3</version>
+                <version>3.5.1</version>
                 <configuration>
                     <excludes>
                         <!-- special exclude for compatibility with ant build script
@@ -157,9 +157,9 @@
                     <charset>UTF-8</charset>
                     <encoding>UTF-8</encoding>
                     <windowtitle>YaCy API: javadoc documentation</windowtitle>
-                    <excludes>
-                        source/net/yacy/htroot/*.java
-                    </excludes>
+                    <includes>
+                        ${project.build.directory}/*.java
+                    </includes>
                     <failOnError>false</failOnError>
                 </configuration>
             </plugin>
@@ -446,11 +446,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.james</groupId>
-            <artifactId>apache-mime4j</artifactId>
-            <version>0.6.1</version>
-        </dependency>
-        <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15</artifactId>
             <version>1.46</version>
@@ -478,7 +473,7 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-            <version>2.4</version>
+            <version>2.5</version>
         </dependency>        
         <dependency>
             <groupId>commons-jxpath</groupId>
@@ -494,11 +489,6 @@
             <groupId>commons-logging</groupId>
             <artifactId>commons-logging</artifactId>
             <version>1.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.pdfbox</groupId>
-            <artifactId>fontbox</artifactId>
-            <version>1.8.11</version>
         </dependency>
         <dependency>
             <groupId>org.htmlparser</groupId>
@@ -523,7 +513,7 @@
         <dependency>
             <groupId>com.ibm.icu</groupId>
             <artifactId>icu4j</artifactId>
-            <version>56.1</version>
+            <version>57.1</version>
         </dependency>
         <dependency>
             <groupId>com.twelvemonkeys.imageio</groupId>
@@ -554,11 +544,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>jcl-over-slf4j</artifactId>
             <version>1.7.18</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.pdfbox</groupId>
-            <artifactId>jempbox</artifactId>
-            <version>1.8.11</version>
         </dependency>
         <dependency>
             <groupId>com.jcraft</groupId>
@@ -603,7 +588,7 @@
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>1.8.11</version>
+            <version>2.0.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
