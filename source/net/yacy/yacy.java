@@ -655,8 +655,17 @@ public final class yacy {
 	        //System.out.print("args=["); for (int i = 0; i < args.length; i++) System.out.print(args[i] + ", "); System.out.println("]");
 	        if ((args.length >= 1) && (args[0].toLowerCase().equals("-startup") || args[0].equals("-start"))) {
 	            // normal start-up of yacy
-	            if (args.length > 1) dataRoot = new File(System.getProperty("user.home").replace('\\', '/'), args[1]);
-                    preReadSavedConfigandInit(dataRoot);
+	            if (args.length > 1) {
+	            	String userHome = System.getProperty("user.home");
+	            	/* On Sandstorm platform, user.home property is set to "?" : try with environment variable HOME */
+	            	if(userHome == null || "?".equals(userHome)) {
+	            		userHome = System.getenv("HOME");
+	            	}
+	            	if(userHome != null) {
+	            		dataRoot = new File(userHome.replace('\\', '/'), args[1]);
+	            	}
+	            }
+                preReadSavedConfigandInit(dataRoot);
 	            startup(dataRoot, applicationRoot, startupMemFree, startupMemTotal, false);
 	        } else if (args.length >= 1 && args[0].toLowerCase().equals("-gui")) {
 	            // start-up of yacy with gui
