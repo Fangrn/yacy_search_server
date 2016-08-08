@@ -21,5 +21,8 @@ set -euo pipefail
 # appropriate for your application.
 cd /opt/app
 
+# Set YaCy HTTP port to the value expected by Sanstorm
+sed -i "/port = 8090/c\port = 8000" /opt/app/defaults/yacy.init
+
 # Compile YaCy Java sources with ant
 ant compile
