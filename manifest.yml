@@ -1,0 +1,13 @@
+--- 
+applications:
+- name: "YaCy Search Server"
+# official cloudfoundry java buildpack :  buildpack: "https://github.com/cloudfoundry/java-buildpack.git"
+  buildpack: https://github.com/heroku/heroku-buildpack-java
+  description: "Decentralized search server"
+  image: "addon/YaCy.ico"
+  logo: "addon/YaCy.ico"
+  repository: "https://github.com/yacy/yacy_search_server.git"
+  website: "http://yacy.net"
+  command: java $JAVA_OPTS -classpath target/classes:lib/* net.yacy.yacy
+  env:
+    MAVEN_CUSTOM_OPTS: "-f libbuild/pom.xml -DskipTests=true"
