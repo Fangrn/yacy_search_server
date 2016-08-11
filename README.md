@@ -1,6 +1,6 @@
 # YaCy
 
-[![Deploy to IBM Bluemix](https://bluemix.net/deploy/button.png)](https://bluemix.net/deploy?repository=https://github.com/luccioman/yacy_search_server/tree/cloudfoundry)
+[![Deploy to IBM Bluemix](https://bluemix.net/deploy/button.png)](https://bluemix.net/deploy?repository=https://github.com/luccioman/yacy_search_server&branch=cloudfoundry)
 
 ## What is this?
 
