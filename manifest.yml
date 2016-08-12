@@ -11,3 +11,4 @@ applications:
   command: java $JAVA_OPTS -classpath target/classes:lib/* net.yacy.yacy
   env:
     MAVEN_CUSTOM_OPTS: "-f libbuild/pom.xml -DskipTests=true"
+    JAVA_OPTS: "-Dnet.yacy.server.localPort=$PORT"
