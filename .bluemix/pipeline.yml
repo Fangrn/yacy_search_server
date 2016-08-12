@@ -1,0 +1,39 @@
+---
+stages:
+- name: Build Stage
+  inputs:
+  - type: git
+    branch: cloudfoundry
+  triggers:
+  - type: commit
+  jobs:
+  - name: Build
+    type: builder
+    artifact_dir: ''
+    build_type: maven
+    script: |-
+      #!/bin/bash
+      mvn -B package -f libbuild/pom.xml -DskipTests=true
+- name: Deploy Stage
+  inputs:
+  - type: job
+    stage: Build Stage
+    job: Build
+  triggers:
+  - type: stage
+  jobs:
+  - name: Deploy to dev
+    type: deployer
+    target:
+      region_id: ibm:yp:eu-gb
+      organization: ${CF_ORGANIZATION}
+      space: ${CF_SPACE}
+      application: ${CF_APP}
+    script: |-
+      #!/bin/bash
+      cf push "${CF_APP}" -c "java $JAVA_OPTS -Dnet.yacy.server.localPort=$PORT -classpath target/classes:lib/* net.yacy.yacy"
+      # cf push "${CF_APP}" -c "sed -i '/port = 8090=/c\port = ${PORT}' defaults/yacy.init && sh startYACY.sh -d"
+      #cf push "${CF_APP}" -c "sh startYACY.sh -d"
+
+      # View logs
+      #cf logs "${CF_APP}" --recent
