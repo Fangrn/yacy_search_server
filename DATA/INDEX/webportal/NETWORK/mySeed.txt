@@ -1,0 +1,1 @@
+p|{NCount=0,Version=1.91009176,Uptime=5,CCount=0.0,LastSeen=20160911123359,USpeed=0,sU=0,SCount=0,LCount=11789,IP=,ISpeed=0,RCount=0,sI=0,Hash=OknMRTYzIt4Z,Port=49152,PeerType=senior,UTC=+0200,Name=_anonufe-18380484-23,ICount=0,rI=0,rU=0,RSpeed=0.0,JRE=1.7.0_111,news=,BDate=20160911121602,Flags=!   }
