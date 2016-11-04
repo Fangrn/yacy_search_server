@@ -19,6 +19,9 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.util.AbstractMap;
 import java.util.Date;
@@ -41,6 +44,7 @@ import net.yacy.peers.graphics.ProfilingGraph;
 import net.yacy.search.EventTracker;
 import net.yacy.search.Switchboard;
 import net.yacy.search.SwitchboardConstants;
+import net.yacy.search.navigator.Navigator;
 import net.yacy.search.query.QueryParams;
 import net.yacy.search.query.SearchEvent;
 import net.yacy.search.query.SearchEventCache;
@@ -95,48 +99,9 @@ public class yacysearchtrailer {
         prop.put("searchdomswitches_searchimage_check", (contentdom == ContentDomain.IMAGE) ? "1" : "0");
         prop.put("searchdomswitches_searchapp_check", (contentdom == ContentDomain.APP) ? "1" : "0");
 
-        // namespace navigators
         String name;
         int count;
         Iterator<String> navigatorIterator;
-        if (theSearch.namespaceNavigator == null || theSearch.namespaceNavigator.isEmpty()) {
-            prop.put("nav-namespace", 0);
-        } else {
-            prop.put("nav-namespace", 1);
-            navigatorIterator = theSearch.namespaceNavigator.keys(false);
-            int i = 0, pos = 0, neg = 0;
-            String nav, rawNav;
-            while (i < QueryParams.FACETS_STANDARD_MAXCOUNT && navigatorIterator.hasNext()) {
-                name = navigatorIterator.next();
-                count = theSearch.namespaceNavigator.get(name);
-                if (count == 0) break;
-                nav = "inurl%3A" + name;
-                /* Avoid double percent encoding in QueryParams.navurl */
-                rawNav = "inurl:" + name;
-                if (!theSearch.query.modifier.toString().contains("inurl:"+name)) {
-                    pos++;
-                    prop.put("nav-namespace_element_" + i + "_on", 1);
-                    prop.put(fileType, "nav-namespace_element_" + i + "_modifier", nav);
-                } else {
-                    neg++;                    
-                    prop.put("nav-namespace_element_" + i + "_on", 0);
-                    prop.put(fileType, "nav-namespace_element_" + i + "_modifier", "-" + nav);
-                    nav="";
-                    rawNav = "";
-                }
-                prop.put(fileType, "nav-namespace_element_" + i + "_name", name);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                prop.put("nav-namespace_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
-                prop.put(fileType, "nav-namespace_element_" + i + "_id", "namespace_" + i);
-                prop.put("nav-namespace_element_" + i + "_count", count);
-                prop.put("nav-namespace_element_" + i + "_nl", 1);
-                i++;
-            }
-            prop.put("nav-namespace_element", i);
-            i--;
-            prop.put("nav-namespace_element_" + i + "_nl", 0);
-            if (pos == 1 && neg == 0) prop.put("nav-namespace", 0); // this navigation is not useful
-        }
 
         // domain navigators
         final ScoreMap<String> hostNavigator = theSearch.hostNavigator;
@@ -166,8 +131,7 @@ public class yacysearchtrailer {
                     rawNav = "";
                 }
                 prop.put(fileType, "nav-domains_element_" + i + "_name", name);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                prop.put("nav-domains_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
+                prop.put(fileType, "nav-domains_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
                 prop.put(fileType, "nav-domains_element_" + i + "_id", "domains_" + i);
                 prop.put("nav-domains_element_" + i + "_count", count);
                 prop.put("nav-domains_element_" + i + "_nl", 1);
@@ -209,8 +173,7 @@ public class yacysearchtrailer {
                 }
                 String longname = ISO639.country(name);
                 prop.put(fileType, "nav-languages_element_" + i + "_name", longname == null ? name : longname);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                prop.put("nav-languages_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
+                prop.put(fileType, "nav-languages_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
                 prop.put(fileType, "nav-languages_element_" + i + "_id", "languages_" + i);
                 prop.put("nav-languages_element_" + i + "_count", count);
                 prop.put("nav-languages_element_" + i + "_nl", 1);
@@ -221,90 +184,6 @@ public class yacysearchtrailer {
             i--;
             prop.put("nav-languages_element_" + i + "_nl", 0);
             if (pos == 1 && neg == 0) prop.put("nav-languages", 0); // this navigation is not useful
-        }
-
-        // author navigators
-        if (theSearch.authorNavigator == null || theSearch.authorNavigator.isEmpty()) {
-            prop.put("nav-authors", 0);
-        } else {
-            prop.put("nav-authors", 1);
-            navigatorIterator = theSearch.authorNavigator.keys(false);
-            int i = 0, pos = 0, neg = 0;
-            String nav, rawNav;
-            while (i < QueryParams.FACETS_STANDARD_MAXCOUNT && navigatorIterator.hasNext()) {
-                name = navigatorIterator.next().trim();
-                count = theSearch.authorNavigator.get(name);
-                if (count == 0) break;
-                nav = (name.indexOf(' ', 0) < 0) ? "author%3A" + name : "author%3A%28" + name.replace(" ", "+") + "%29";
-                /* Avoid double percent encoding in QueryParams.navurl */
-                rawNav = (name.indexOf(' ', 0) < 0) ? "author:" + name : "author:(" + name.replace(" ", "+") + ")";
-                if (theSearch.query.modifier.author == null || !theSearch.query.modifier.author.contains(name)) {
-                    pos++;
-                    prop.put("nav-authors_element_" + i + "_on", 1);
-                    prop.put(fileType, "nav-authors_element_" + i + "_modifier", nav);
-                } else {
-                    neg++;                    
-                    prop.put("nav-authors_element_" + i + "_on", 0);
-                    prop.put(fileType, "nav-authors_element_" + i + "_modifier", "-" + nav);
-                    nav="";
-                    rawNav = "";
-                }
-                prop.put(fileType, "nav-authors_element_" + i + "_name", name);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                prop.put("nav-authors_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
-                prop.put(fileType, "nav-authors_element_" + i + "_id", "authors_" + i);
-                prop.put("nav-authors_element_" + i + "_count", count);
-                prop.put("nav-authors_element_" + i + "_nl", 1);
-                i++;
-            }
-            prop.put("nav-authors_element", i);
-            prop.put("nav-authors_count", i);
-            i--;
-            prop.put("nav-authors_element_" + i + "_nl", 0);
-            if (pos == 1 && neg == 0) {
-                prop.put("nav-authors", 0); // this navigation is not useful
-            }
-        }
-
-        // collection navigators
-        if (theSearch.collectionNavigator == null || theSearch.collectionNavigator.isEmpty()) {
-            prop.put("nav-collections", 0);
-        } else {
-            prop.put("nav-collections", 1);
-            navigatorIterator = theSearch.collectionNavigator.keys(false);
-            int i = 0, pos = 0, neg = 0;
-            String nav, rawNav;
-            while (i < QueryParams.FACETS_STANDARD_MAXCOUNT && navigatorIterator.hasNext()) {
-                name = navigatorIterator.next().trim();
-                count = theSearch.collectionNavigator.get(name);
-                if (count == 0) break;
-                nav = (name.indexOf(' ', 0) < 0) ? "collection%3A" + name : "collection%3A%28" + name.replace(" ", "+") + "%29";
-                /* Avoid double percent encoding in QueryParams.navurl */
-                rawNav = (name.indexOf(' ', 0) < 0) ? "collection:" + name : "collection:(" + name.replace(" ", "+") + ")";
-                if (theSearch.query.modifier.collection == null || !theSearch.query.modifier.collection.contains(name)) {
-                    pos++;
-                    prop.put("nav-collections_element_" + i + "_on", 1);
-                    prop.put(fileType, "nav-collections_element_" + i + "_modifier", nav);
-                } else {
-                    neg++;                    
-                    prop.put("nav-collections_element_" + i + "_on", 0);
-                    prop.put(fileType, "nav-collections_element_" + i + "_modifier", "-" + nav);
-                    nav="";
-                    rawNav = "";
-                }
-                prop.put(fileType, "nav-collections_element_" + i + "_name", name);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                prop.put("nav-collections_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, true).toString());
-                prop.put(fileType, "nav-collections_element_" + i + "_id", "collections_" + i);
-                prop.put("nav-collections_element_" + i + "_count", count);
-                prop.put("nav-collections_element_" + i + "_nl", 1);
-                i++;
-            }
-            prop.put("nav-collections_element", i);
-            prop.put("nav-collections_count", i);
-            i--;
-            prop.put("nav-collections_element_" + i + "_nl", 0);
-            if (pos == 1 && neg == 0) prop.put("nav-collections", 0); // this navigation is not useful
         }
 
         // topics navigator
@@ -337,7 +216,7 @@ public class yacysearchtrailer {
                 prop.put("nav-topics_element_" + i + "_on", 1);
                 prop.put(fileType, "nav-topics_element_" + i + "_modifier", name);
                 prop.put(fileType, "nav-topics_element_" + i + "_name", name);
-                prop.put("nav-topics_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, name, false).toString());
+                prop.put(fileType, "nav-topics_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, name, false).toString());
                 prop.put("nav-topics_element_" + i + "_count", count);
                 int fontsize = TOPWORDS_MINSIZE + (TOPWORDS_MAXSIZE - TOPWORDS_MINSIZE) * (count - mincount) / (1 + maxcount - mincount);
                 fontsize = Math.max(TOPWORDS_MINSIZE, fontsize - (name.length() - 5));
@@ -362,7 +241,6 @@ public class yacysearchtrailer {
             navigatorIterator = theSearch.protocolNavigator.keys(false);
             int i = 0, pos = 0, neg = 0;
             String nav, rawNav;
-            boolean visible = false;
             String oldQuery = theSearch.query.getQueryGoal().query_original; // prepare hack to make radio-button like navigation
             String oldProtocolModifier = theSearch.query.modifier.protocol;
             if (oldProtocolModifier != null && oldProtocolModifier.length() > 0) {theSearch.query.modifier.remove("/" + oldProtocolModifier); theSearch.query.modifier.remove(oldProtocolModifier);}
@@ -372,7 +250,6 @@ public class yacysearchtrailer {
                 name = navigatorIterator.next().trim();
                 count = theSearch.protocolNavigator.get(name);
                 if (count == 0) break;
-                visible = visible || "ftp,smb".indexOf(name) >= 0;
                 nav = "%2F" + name;
                 /* Avoid double percent encoding in QueryParams.navurl */
                 rawNav = "/" + name;
@@ -388,9 +265,9 @@ public class yacysearchtrailer {
                     rawNav = "";
                 }
                 prop.put(fileType, "nav-protocols_element_" + i + "_name", name);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
                 String url = QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString();
                 prop.put("nav-protocols_element_" + i + "_on_url", url);
+                prop.put(fileType, "nav-protocols_element_" + i + "_url", url);
                 prop.put("nav-protocols_element_" + i + "_count", count);
                 prop.put("nav-protocols_element_" + i + "_nl", 1);
                 i++;
@@ -485,8 +362,7 @@ public class yacysearchtrailer {
                     rawNav = "";
                 }
                 prop.put(fileType, "nav-filetypes_element_" + i + "_name", name);
-                /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                prop.put("nav-filetypes_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
+                prop.put(fileType, "nav-filetypes_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
                 prop.put(fileType, "nav-filetypes_element_" + i + "_id", "filetypes_" + i);
                 prop.put("nav-filetypes_element_" + i + "_count", count);
                 prop.put("nav-filetypes_element_" + i + "_nl", 1);
@@ -529,8 +405,7 @@ public class yacysearchtrailer {
                         rawNav = "";
                     }
                     prop.put(fileType, "nav-vocabulary_" + navvoccount + "_element_" + i + "_name", name);
-                    /* URL is already percent encoded : no need to re-encode specifically for the file type */
-                    prop.put("nav-vocabulary_" + navvoccount + "_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
+                    prop.put(fileType, "nav-vocabulary_" + navvoccount + "_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
                     prop.put(fileType, "nav-vocabulary_" + navvoccount + "_element_" + i + "_id", "vocabulary_" + navname + "_" + i);
                     prop.put("nav-vocabulary_" + navvoccount + "_element_" + i + "_count", count);
                     prop.put("nav-vocabulary_" + navvoccount + "_element_" + i + "_nl", 1);
@@ -546,6 +421,67 @@ public class yacysearchtrailer {
         } else {
             prop.put("nav-vocabulary", 0);
         }
+
+        // navigator plugins
+        int ni = 0;
+        for (String naviname : theSearch.navigatorPlugins.keySet()) {
+
+            Navigator navi = theSearch.navigatorPlugins.get(naviname);
+            if (navi.isEmpty()) {
+                continue;
+            }
+
+            prop.put("navs_" + ni + "_displayname", navi.getDisplayName());
+            prop.put("navs_" + ni + "_name", naviname);
+            prop.put("navs_" + ni + "_count", navi.size());
+
+            navigatorIterator = navi.keys(false);
+            int i = 0, pos = 0, neg = 0;
+            String nav, rawNav;
+            while (i < QueryParams.FACETS_STANDARD_MAXCOUNT && navigatorIterator.hasNext()) {
+                name = navigatorIterator.next();
+                count = navi.get(name);
+                if (count == 0) {
+                    break;
+                }
+                String encname = ((name.indexOf(' ', 0) < 0) ? name : "(" + name + ")");
+                try {
+                    nav = URLEncoder.encode(navi.getQueryModifier() + encname, StandardCharsets.UTF_8.name());
+                } catch (UnsupportedEncodingException ex) {
+                    nav = "";
+                }
+
+                rawNav = navi.getQueryModifier() + encname;
+                boolean isactive = navi.modifieractive(theSearch.query.modifier, name);
+                if (!isactive) {
+                    pos++;
+                    prop.put("navs_" + ni + "_element_" + i + "_on", 1);
+                    prop.put(fileType, "navs_" + ni + "_element_" + i + "_modifier", nav);
+                } else {
+                    neg++;
+                    prop.put("navs_" + ni + "_element_" + i + "_on", 0);
+                    prop.put(fileType, "navs_" + ni + "_element_" + i + "_modifier", "-" + nav);
+                    nav = "";
+                    rawNav = "";
+                }
+                prop.put(fileType, "navs_" + ni + "_element_" + i + "_name", navi.getElementDisplayName(name));
+                prop.put(fileType, "navs_" + ni + "_element_" + i + "_url", QueryParams.navurl(fileType, 0, theSearch.query, rawNav, false).toString());
+                prop.put(fileType, "navs_" + ni + "_element_" + i + "_id", naviname + "_" + i);
+                prop.put("navs_" + ni + "_element_" + i + "_count", count);
+                prop.put("navs_" + ni + "_element_" + i + "_nl", 1);
+                i++;
+            }
+            prop.put("navs_" + ni + "_element", i);
+            prop.put("navs_" + ni + "_count", i);
+            i--;
+            prop.put("navs_" + ni + "_element_" + i + "_nl", 0);
+            if (pos == 1 && neg == 0) {
+                prop.put("navs_" + ni, 0); // this navigation is not useful
+            }
+
+            ni++;
+        }
+        prop.put("navs", ni); // navigatior plugins - eof
 
         // about box
         final String aboutBody = env.getConfig("about.body", "");

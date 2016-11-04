@@ -80,7 +80,7 @@ import org.apache.solr.util.DateFormatUtil;
 
 public final class QueryParams {
 
-    public static int FACETS_STANDARD_MAXCOUNT = 10000;
+    public static int FACETS_STANDARD_MAXCOUNT = 100; // max count of item lines in navigator
     public static int FACETS_DATE_MAXCOUNT = 640;
     
     public enum Searchdom {
@@ -224,7 +224,6 @@ public final class QueryParams {
         } catch (final PatternSyntaxException ex) {
             throw new IllegalArgumentException("Not a valid regular expression: " + prefer, ex);
         }
-        this.prefer.toString().equals(matchnothing_pattern.toString());
         assert language != null;
         this.targetlang = language;
         this.metatags = metatags;

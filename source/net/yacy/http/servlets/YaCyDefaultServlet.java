@@ -62,10 +62,12 @@ import javax.servlet.http.HttpServletResponse;
 import net.yacy.cora.date.GenericFormatter;
 import net.yacy.cora.document.analysis.Classification;
 import net.yacy.cora.order.Base64Order;
+import net.yacy.cora.protocol.Domains;
 import net.yacy.cora.protocol.HeaderFramework;
 import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.cora.util.ByteBuffer;
 import net.yacy.cora.util.ConcurrentLog;
+import net.yacy.data.InvalidURLLicenceException;
 import net.yacy.data.UserDB.AccessRight;
 import net.yacy.data.UserDB.Entry;
 import net.yacy.kelondro.util.FileUtils;
@@ -691,6 +693,46 @@ public class YaCyDefaultServlet extends HttpServlet  {
         }
         return result;
     }
+    
+    /**
+     * Returns the URL base for this peer, determined from request header when present. Use this when absolute URL rendering is required, 
+     * otherwise relative URLs should be preferred.
+     * @param header request header.
+     * @param sb Switchboard instance.
+     * @return the application context (URL request base) from request header or default configuration. This is
+     * either http://hostname:port or https://hostname:sslport
+     */
+    public static String getContext(final RequestHeader header, final Switchboard sb) {
+        String hostAndPort = null;
+        if(header != null) {
+        	hostAndPort = header.get(HeaderFramework.HOST);
+        }
+        String protocol = "http";
+        if (hostAndPort == null) {
+        	if(sb != null) {
+        		hostAndPort = Domains.LOCALHOST + ":" + sb.getConfigInt("port", 8090);
+        	} else {
+        		hostAndPort = Domains.LOCALHOST + ":8090";
+        	}
+        } else {
+            final String sslport;
+            if(sb != null) {
+            	sslport = ":" + sb.getConfigInt("port.ssl", 8443);
+            } else {
+            	sslport = ":8443";
+            }
+            if (hostAndPort.endsWith(sslport)) { // connection on ssl port, use https protocol
+                protocol = "https";
+            }
+        }
+        /* YaCyDefaultServelt should have filled this custom header, making sure we know here whether original request is http or https
+         *  (when default ports (80 and 443) are used, there is no way to distinguish the two schemes relying only on the Host header) */
+        protocol = header.get(HeaderFramework.X_YACY_REQUEST_SCHEME, protocol);
+        
+        /* Note : this implementation lets the responsibility to any eventual Reverse Proxy to eventually rewrite the rendered absolute URL */
+        
+        return protocol + "://" + hostAndPort;
+    }
 
     protected RequestHeader generateLegacyRequestHeader(HttpServletRequest request, String target, String targetExt) {
         RequestHeader legacyRequestHeader = convertHeaderFromJetty(request);
@@ -873,7 +915,20 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 } else {
                     tmp = invokeServlet(targetClass, legacyRequestHeader, args);
                 }
-            } catch (InvocationTargetException | IllegalArgumentException | IllegalAccessException e) {
+            } catch(InvocationTargetException e) {
+            	if(e.getCause() instanceof InvalidURLLicenceException) {
+                	/* A non authaurized user is trying to fetch a image with a bad or already released license code */
+                	response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getCause().getMessage());
+                	return;
+                }
+            	if(e.getCause() instanceof TemplateMissingParameterException) {
+                	/* A template is used but miss some required parameter */
+                	response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getCause().getMessage());
+                	return;
+                }
+            	ConcurrentLog.logException(e);
+                throw new ServletException(targetFile.getAbsolutePath());
+            } catch (IllegalArgumentException | IllegalAccessException e) {
                 ConcurrentLog.logException(e);
                 throw new ServletException(targetFile.getAbsolutePath());
             }
@@ -916,16 +971,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                     result = RasterPlotter.exportImage(bi, targetExt);
                 }
 
-                boolean staticImage = target.equals("/ViewImage.png");
-               
-                if (staticImage) {
-                    if (response.containsHeader(HeaderFramework.LAST_MODIFIED)) {
-                        response.getHeaders(HeaderFramework.LAST_MODIFIED).clear(); // if this field is present, the reload-time is a 10% fraction of ttl and other caching headers do not work
-                    }
-
-                    // cache-control: allow shared caching (i.e. proxies) and set expires age for cache
-                    response.setHeader(HeaderFramework.CACHE_CONTROL, "public, max-age=" + Integer.toString(600)); // seconds; ten minutes
-                }
+                updateRespHeadersForImages(target, response);
                 final String mimeType = Classification.ext2mime(targetExt, MimeTypes.Type.TEXT_HTML.asString());
                 response.setContentType(mimeType);
                 response.setContentLength(result.length());
@@ -937,6 +983,9 @@ public class YaCyDefaultServlet extends HttpServlet  {
             }
 
             if (tmp instanceof InputStream) {
+            	/* Images and favicons can also be written directly from an inputStream */
+            	updateRespHeadersForImages(target, response);
+            	
                 writeInputStream(response, targetExt, (InputStream)tmp);
                 return;
             }
@@ -1039,6 +1088,22 @@ public class YaCyDefaultServlet extends HttpServlet  {
             }
         }
     }
+
+    /**
+     * Eventually update response headers for image resources
+     * @param target the query target
+     * @param response servlet response to eventually update
+     */
+	private void updateRespHeadersForImages(String target, HttpServletResponse response) {
+		if (target.equals("/ViewImage.png") || target.equals("/ViewFavicon.png")) {
+		    if (response.containsHeader(HeaderFramework.LAST_MODIFIED)) {
+		        response.getHeaders(HeaderFramework.LAST_MODIFIED).clear(); // if this field is present, the reload-time is a 10% fraction of ttl and other caching headers do not work
+		    }
+
+		    // cache-control: allow shared caching (i.e. proxies) and set expires age for cache
+		    response.setHeader(HeaderFramework.CACHE_CONTROL, "public, max-age=" + Integer.toString(600)); // seconds; ten minutes
+		}
+	}
 
 
     /**
@@ -1199,7 +1264,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 Thread[] p = new Thread[t];
                 for (int j = 0; j < t; j++) {
                     files.put(POISON);
-                    p[j] = new Thread() {
+                    p[j] = new Thread("YaCyDefaultServlet.parseMultipart-" + j) {
                         @Override
                         public void run() {
                             Map.Entry<String, byte[]> job;

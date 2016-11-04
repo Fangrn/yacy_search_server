@@ -74,7 +74,7 @@ public final class FileUtils {
     }
 
     /**
-     * Copies an InputStream to an OutputStream.
+     * Copies an InputStream to an OutputStream. Important : it is the responsibility of the caller to close the input and output streams.
      *
      * @param source InputStream
      * @param dest OutputStream
@@ -165,7 +165,7 @@ public final class FileUtils {
     }
 
     /**
-     * Copies an InputStream to a File.
+     * Copies an InputStream to a File. Important : it is the responsibility of the caller to close the source stream.
      *
      * @param source InputStream
      * @param dest File
@@ -235,7 +235,7 @@ public final class FileUtils {
     }
 
     /**
-     * Copies a File to an OutputStream.
+     * Copies a File to an OutputStream. Important : it is the responsibility of the caller to close the output stream.
      *
      * @param source File
      * @param dest OutputStream
@@ -965,7 +965,7 @@ public final class FileUtils {
      * @param concurrent if this shall run concurrently
      */
     public static void checkCharset(final File file, final String givenCharset, final boolean concurrent) {
-        Thread t = new Thread() {
+        Thread t = new Thread("FileUtils.checkCharset") {
             @Override
             public void run() {
                 try {
