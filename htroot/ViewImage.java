@@ -76,8 +76,8 @@ public class ViewImage {
 			throw new TemplateMissingParameterException("please fill at least url or code parameter");
 		}
 
-		String ext = header.get("EXT", null);
-		final boolean auth = Domains.isLocalhost(header.get(HeaderFramework.CONNECTION_PROP_CLIENTIP, ""))
+		String ext = header.get(HeaderFramework.CONNECTION_PROP_EXT, null);
+		final boolean auth = Domains.isLocalhost(header.getRemoteAddr())
 				|| sb.verifyAuthentication(header); // handle access rights
 
 		DigestURL url = VIEWER.parseURL(post, auth);

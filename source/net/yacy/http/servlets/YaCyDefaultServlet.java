@@ -680,7 +680,9 @@ public class YaCyDefaultServlet extends HttpServlet  {
      * Convert ServletRequest header to YaCy RequestHeader
      * @param request ServletRequest
      * @return RequestHeader created from ServletRequest
+     * @deprecated use RequestHeader(HttpServletRequest); but .remove(key) can't be used after switch to new instance
      */
+    @Deprecated // TODO: only used for proxy, should be handled there
     public static RequestHeader convertHeaderFromJetty(HttpServletRequest request) {
         RequestHeader result = new RequestHeader();
         Enumeration<String> headerNames = request.getHeaderNames();
@@ -709,23 +711,11 @@ public class YaCyDefaultServlet extends HttpServlet  {
     public static String getContext(final RequestHeader header, final Switchboard sb) {
         String protocol = "http";
         String hostAndPort = null;
-        if(header != null) {
-        	if(hostAndPort == null){
-            	hostAndPort = header.get(HeaderFramework.HOST);
-            	
-            	/* We can try here to figure out if we are using http or https, relying on the port used.
-            	 * This only works port is not standard (80 or 443) : if so HeaderFramework.X_YACY_REQUEST_SCHEME will be more reliable */
-                final String sslport;
-                if(sb != null) {
-                	sslport = ":" + sb.getConfigInt("port.ssl", 8443);
-                } else {
-                	sslport = ":8443";
-                }
-                if (hostAndPort != null && hostAndPort.endsWith(sslport)) { // connection on ssl port, use https protocol
-                    protocol = "https";
-                }
-        	}
+        if (header != null) {
+            hostAndPort = header.get(HeaderFramework.HOST);
+            protocol = header.getScheme();
         }
+
         /* Host and port still null : let's use the default local ones */
         if (hostAndPort == null) {
         	if(sb != null) {
@@ -736,14 +726,12 @@ public class YaCyDefaultServlet extends HttpServlet  {
         }
         
         if(header != null) {
-        	/* YaCyDefaultServelt should have filled this custom header, making sure we know here whether original request is http or https
-        	 *  (when default ports (80 and 443) are used, there is no way to distinguish the two schemes relying only on the Host header) */
-        	String protocolHeader = header.get(HeaderFramework.X_YACY_REQUEST_SCHEME, "").toLowerCase();
+        	String protocolHeader = header.getScheme();
         	
-    		/* Let's check this custom header has a valid value */
+    		/* Let's check this header has a valid value */
         	if("http".equals(protocolHeader) || "https".equals(protocolHeader)) {
         		protocol = protocolHeader.toLowerCase();
-        	} else if(!protocolHeader.isEmpty()) {
+        	} else if(protocolHeader != null && !protocolHeader.isEmpty()) {
     			ConcurrentLog.warn("FILEHANDLER","YaCyDefaultServlet: illegal " + HeaderFramework.X_YACY_REQUEST_SCHEME + " header value : " + protocolHeader);
     		}
         	
@@ -763,15 +751,11 @@ public class YaCyDefaultServlet extends HttpServlet  {
         return protocol + "://" + hostAndPort;
     }
 
-    protected RequestHeader generateLegacyRequestHeader(HttpServletRequest request, String target, String targetExt) {
-        RequestHeader legacyRequestHeader = convertHeaderFromJetty(request);
+    private RequestHeader generateLegacyRequestHeader(HttpServletRequest request, String target, String targetExt) {
+        RequestHeader legacyRequestHeader = new RequestHeader(request);
 
-        legacyRequestHeader.put(HeaderFramework.CONNECTION_PROP_CLIENTIP, request.getRemoteAddr());
-        legacyRequestHeader.put(HeaderFramework.CONNECTION_PROP_PATH, target);
+        legacyRequestHeader.put(HeaderFramework.CONNECTION_PROP_PATH, target); // target may contain a server side include (SSI)
         legacyRequestHeader.put(HeaderFramework.CONNECTION_PROP_EXT, targetExt);
-        /* Add request scheme (http or https) to allow templates to know wether original request is http or https 
-         * (when default ports (80 and 443) are used, there is no way to distinguish the two schemes relying only on the Host header) */
-        legacyRequestHeader.put(HeaderFramework.X_YACY_REQUEST_SCHEME, request.getScheme());
         Switchboard sb = Switchboard.getSwitchboard();
         if (legacyRequestHeader.containsKey(RequestHeader.AUTHORIZATION)) {
             if (HttpServletRequest.BASIC_AUTH.equalsIgnoreCase(request.getAuthType())) {
@@ -879,6 +863,17 @@ public class YaCyDefaultServlet extends HttpServlet  {
         return m;
     }
 
+    /**
+     * Handles a YaCy servlet template, reads the template and replaces the template
+     * items with actual values. Because of supported server side includes target 
+     * might not be the same as request.getPathInfo
+     * 
+     * @param target the path to the template
+     * @param request the remote servlet request
+     * @param response
+     * @throws IOException
+     * @throws ServletException
+     */
     protected void handleTemplate(String target,  HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         Switchboard sb = Switchboard.getSwitchboard();
 
@@ -1064,6 +1059,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 templatePatterns.putHTML(servletProperties.PEER_STAT_CLIENTNAME, sb.peers.mySeed().getName());
                 templatePatterns.putHTML(servletProperties.PEER_STAT_CLIENTID, sb.peers.myID());
                 templatePatterns.put(servletProperties.PEER_STAT_MYTIME, GenericFormatter.SHORT_SECOND_FORMATTER.format());
+                templatePatterns.put(servletProperties.RELATIVE_BASE, YaCyDefaultServlet.getRelativeBase(target));
                 Seed myPeer = sb.peers.mySeed();
                 templatePatterns.put("newpeer", myPeer.getAge() >= 1 ? 0 : 1);
                 templatePatterns.putHTML("newpeer_peerhash", myPeer.hash);
@@ -1109,13 +1105,51 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 response.setContentType(mimeType);
                 response.setStatus(HttpServletResponse.SC_OK);
                 ByteArrayOutputStream bas = new ByteArrayOutputStream(4096);
-                // apply templates
-                TemplateEngine.writeTemplate(targetFile.getName(), fis, bas, templatePatterns);                
-                fis.close();
-                // handle SSI
-                parseSSI (bas.toByteArray(),request,response);
+                try {
+                	// apply templates
+                	TemplateEngine.writeTemplate(targetFile.getName(), fis, bas, templatePatterns);
+                	
+                    // handle SSI
+                    parseSSI (bas.toByteArray(),request,response);
+                } finally {
+                	try {
+                		fis.close();
+                	} catch(IOException ignored) {
+                		ConcurrentLog.warn("FILEHANDLER", "YaCyDefaultServlet: could not close target file " + targetFile.getName());
+                	}
+                	
+                	try {
+                		bas.close();
+                	} catch(IOException ignored) {
+                		/* Should never happen with a ByteArrayOutputStream */
+                	}
+                }
             }
         }
+    }
+    
+    /**
+     * Returns the relative path prefix necessary to reach htroot from the deepest level of targetPath.<br>
+     * Example : targetPath="api/citation.html" returns "../"
+     * targetPath is supposed to have been cleaned earlier from special chars such as "?", spaces, "//".
+     * @param targetPath target path relative to htroot
+     * @return the relative path prefix, eventually empty
+     */
+    protected static String getRelativeBase(String targetPath) {
+    	StringBuilder relativeBase = new StringBuilder();
+    	if(targetPath != null) {
+    		/* Normalize target path : it is relative to htroot, starting with a slash or not */
+    		if(targetPath.startsWith("/")) {
+    			targetPath = targetPath.substring(1, targetPath.length());
+    		}
+    		
+    		int slashIndex = targetPath.indexOf('/', 0);
+    		while(slashIndex >= 0) {
+    			relativeBase.append("../");
+    			slashIndex = targetPath.indexOf('/', slashIndex + 1);
+    		}
+    	}
+    	return relativeBase.toString();
     }
 
     /**
