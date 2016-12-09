@@ -532,3 +532,7 @@ host_extent_i  # number of documents from the same host; can be used to measure 
 ## collection of all vocabulary names that have a matcher in the document - use this to boost with vocabularies
 vocabularies_sxt  # collection of all vocabulary names that have a matcher in the document - use this to boost with vocabularies
     
+icons_protocol_sxt  # all icon links protocols : split from icons_urlstub to provide some compression, as http protocol is implied as default and not stored
+icons_rel_sxt  # all icon links relationships space separated (e.g. 'icon apple-touch-icon')
+icons_sizes_sxt  # all icon sizes space separated (e.g. '16x16 32x32')
+icons_urlstub_sxt  # all icon links without the protocol and '://'
