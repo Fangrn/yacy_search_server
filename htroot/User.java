@@ -27,6 +27,7 @@
 //javac -classpath .:../Classes Message.java
 //if the shell's current path is HTROOT
 
+import javax.servlet.ServletException;
 import net.yacy.cora.order.Base64Order;
 import net.yacy.cora.order.Digest;
 import net.yacy.cora.protocol.RequestHeader;
@@ -53,7 +54,7 @@ public class User{
         prop.put("logged-in_username", "");
         prop.put("logged-in_returnto", "");
         //identified via HTTPPassword
-        entry=sb.userDB.proxyAuth((requestHeader.get(RequestHeader.AUTHORIZATION, "xxxxxx")));
+        entry=sb.userDB.proxyAuth(requestHeader.get(RequestHeader.AUTHORIZATION));
         if(entry != null){
         	prop.put("logged-in_identified-by", "1");
         //try via cookie
@@ -90,28 +91,31 @@ public class User{
         }else if(sb.verifyAuthentication(requestHeader)){
             prop.put("logged-in", "2");
         //identified via form-login
-        //TODO: this does not work for a static admin, yet.
-        }else if(post != null && post.containsKey("username") && post.containsKey("password")){
+        } else if (post != null && post.containsKey("username") && post.containsKey("password")) {
         	if (post.containsKey("returnto"))
         		prop.putHTML("logged-in_returnto", post.get("returnto"));
             final String username=post.get("username");
             final String password=post.get("password");
             prop.putHTML("logged-in_username", username);
 
-            entry=sb.userDB.passwordAuth(username, password);
-            final boolean staticAdmin = sb.getConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5, "").equals(
-                    Digest.encodeMD5Hex(
-                            Base64Order.standardCoder.encodeString(username + ":" + password)
-                    )
-            );
+            entry = sb.userDB.passwordAuth(username, password);
+            boolean staticAdmin = false;
+            if (entry == null) {
+                // check for old style admin account
+                staticAdmin = sb.getConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5, "").equals(
+                        Digest.encodeMD5Hex(Base64Order.standardCoder.encodeString(username + ":" + password)));
+                if (!staticAdmin) {
+                    // check for DIGEST authentication admin account
+                    final String realm = sb.getConfig(SwitchboardConstants.ADMIN_REALM, "YaCy");
+                    staticAdmin = sb.getConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5, "").equals(
+                            "MD5:" + Digest.encodeMD5Hex(username + ":" + realm + ":" + password));
+                }
+            }
+
             String cookie="";
-            if(entry != null)
+            if(entry != null) {
                 //set a random token in a cookie
                 cookie=sb.userDB.getCookie(entry);
-            else if(staticAdmin)
-                cookie=sb.userDB.getAdminCookie();
-
-            if(entry != null || staticAdmin){
                 final ResponseHeader outgoingHeader=new ResponseHeader(200);
                 outgoingHeader.setCookie("login", cookie);
                 prop.setOutgoingHeader(outgoingHeader);
@@ -156,13 +160,10 @@ public class User{
             if(entry != null){
                 final String ip = requestHeader.getRemoteAddr();
                 entry.logout((ip != null ? ip : "xxxxxx"), UserDB.getLoginToken(requestHeader.getHeaderCookies())); //todo: logout cookie
-            }else{
-                sb.userDB.adminLogout(UserDB.getLoginToken(requestHeader.getHeaderCookies()));
             }
-            //XXX: This should not be needed anymore, because of isLoggedout
-            if(! (requestHeader.get(RequestHeader.AUTHORIZATION, "xxxxxx")).equals("xxxxxx")){
-            	prop.authenticationRequired();
-            }
+            try {
+                requestHeader.logout(); // servlet container session logout
+            } catch (ServletException ex) {}
             if(post.containsKey("returnto")){
                 prop.putHTML(serverObjects.ACTION_LOCATION, post.get("returnto"));
             }

@@ -385,13 +385,12 @@ serverClient=*
 #use User_p.html to create some Users.
 use_proxyAccounts=true
 
-# adminAccount: a user:password - pair for administration of
+# adminAccountBase64MD5: a encoded user:password - pair for administration of
 # settings through the web interface
 # should be set to a secret. By default it is without a password
 # but you are encouraged to set it to another value on the page
 # http://localhost:8090/ConfigAccounts_p.html
-#adminAccount=admin:mysecretpassword
-adminAccount=
+#adminAccountBase64=MD5:{admin:realm:mysecretpassword}
 adminAccountBase64MD5=
 adminAccountUserName=admin
 
@@ -855,7 +854,7 @@ search.result.show.snapshots = false
 # can be temporary different if search string is given with differen navigation values
 # assigning no value(s) means that no navigation is shown
 search.navigation=location,hosts,authors,namespace,topics,filetype,protocol,language
-#search.navigation=location,hosts,authors,namespace,topics,filetype,protocol,language,collections,date
+#search.navigation=location,hosts,authors,namespace,topics,filetype,protocol,language,collections,date,year,year:dates_in_content_dts:Event
 
 # max number of items displayed in search navigators
 search.navigation.maxcount=100
@@ -1087,6 +1086,9 @@ thumbnailProgram =
 # - surftips  : the surftips-page
 # - wiki      : the wiki-page
 httpd.robots.txt = locked,dirs,bookmarks,network,news,status,profile
+
+# maximum number of robots.txt loading threads
+robots.txt.MaxActiveThreads = 200
 
 # class to use for parsing wikicode
 wikiParser.class = de.anomic.data.wikiCode

@@ -43,7 +43,11 @@ public final class SwitchboardConstants {
      * With introduction of DIGEST authentication all passwords are MD5 encoded and calculatd as <code>username:adminrealm:password</code>
      * To differentiate old and new admin passwords, use the new calculated passwords a "MD5:" prefix.
      */
-    public static final String ADMIN_ACCOUNT                = "adminAccount";
+    
+    public static final String ADMIN_ACCOUNT                = "adminAccount"; // not used anymore (did hold clear text  username:pwd)
+
+    // this holds the credential "MD5:" + Digest.encodeMD5Hex(adminAccountUserName + ":" + adminRealm + ":" + password)
+    // or the depreciated old style MapTools.encodeMD5Hex( Base64Order.standardCoder.encode(adminAccountUserName + ":" + password) )
     public static final String ADMIN_ACCOUNT_B64MD5         = "adminAccountBase64MD5";
     public static final String ADMIN_ACCOUNT_USER_NAME      = "adminAccountUserName"; // by default 'admin'
     public static final String ADMIN_ACCOUNT_FOR_LOCALHOST  = "adminAccountForLocalhost";
@@ -338,6 +342,10 @@ public final class SwitchboardConstants {
     public static final String HTTPC_NAME_CACHE_CACHING_PATTERNS_NO = "httpc.nameCacheNoCachingPatterns";
     public static final String ROBOTS_TXT                       = "httpd.robots.txt";
     public static final String ROBOTS_TXT_DEFAULT               = RobotsTxtConfig.LOCKED + "," + RobotsTxtConfig.DIRS;
+    /** Key of the setting configuring how many active robots.txt loading threads may be running on the same time at max */
+    public static final String ROBOTS_TXT_THREADS_ACTIVE_MAX       = "robots.txt.MaxActiveThreads";
+    /** Default value of the setting configuring how many active robots.txt loading threads may be running on the same time at max */
+    public static final int ROBOTS_TXT_THREADS_ACTIVE_MAX_DEFAULT       = 200;
 
     /**
      * <p><code>public static final String <strong>BLACKLIST_CLASS_DEFAULT</strong> = "de.anomic.plasma.urlPattern.defaultURLPattern"</code></p>

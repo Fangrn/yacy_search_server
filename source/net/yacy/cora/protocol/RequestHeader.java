@@ -48,6 +48,7 @@ import javax.servlet.http.Part;
 import net.yacy.cora.document.id.DigestURL;
 import net.yacy.cora.document.id.MultiProtocolURL;
 import net.yacy.cora.util.NumberTools;
+import org.eclipse.jetty.server.CookieCutter;
 
 /**
  * YaCy servlet request header.
@@ -146,6 +147,21 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
         return false;
     }
 
+    /**
+     * Gets the header entry "Cookie" as on string containing all cookies
+     *
+     * @return String with cookies separated by ';'
+     * @see getCookies()
+     */
+    public String getHeaderCookies() { // TODO: harmonize with standard getCookies
+        String cookiestring = this.get(COOKIE); // get from legacy or HttpServletRequest
+        if (cookiestring == null) {
+            return "";
+        } else {
+            return cookiestring;
+        }
+    }
+
     // implementation of HttpServletRequest procedures
     // the general approach is to prefer values in the YaCy legacy RequestHeader.map and if no value exists
     // to use the httpservletrequest. This approach is used, because legacy requestheader allows to add or
@@ -206,18 +222,23 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
     public String getAuthType() {
         if (_request != null) {
             return _request.getAuthType();
-        } else if (super.containsKey(RequestHeader.AUTHORIZATION)) {
-            return HttpServletRequest.BASIC_AUTH; // legacy supported only BASIC
         }
-        return null;
+        return null; // according to spec return only value if authenticated
     }
 
     @Override
     public Cookie[] getCookies() {
         if (_request != null) {
             return _request.getCookies();
+        } else {
+            String cstr = super.get(COOKIE);
+            if (cstr != null) {
+                CookieCutter cc = new CookieCutter(); // reuse jetty cookie parser
+                cc.addCookieField(cstr);
+                return cc.getCookies();
+            }
+            return null;
         }
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -311,8 +332,7 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
         if (_request != null) {
             return _request.getQueryString();
         } else {
-            // in case of discoraged use of arbitrary header prop
-            return super.get(HeaderFramework.CONNECTION_PROP_ARGS);
+            return null;
         }
     }
 
@@ -454,8 +474,9 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
     public void login(String username, String password) throws ServletException {
         if (_request != null) {
             _request.login(username, password);
+        } else {
+            throw new UnsupportedOperationException("Not supported yet.");
         }
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -463,7 +484,10 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
         if (_request != null) {
             _request.logout();
         }
-        throw new UnsupportedOperationException("Not supported yet.");
+
+        super.remove(AUTHORIZATION);
+        // TODO: take care of legacy login cookie (and possibly cached UserDB login status)
+
     }
 
     @Override
@@ -519,8 +543,14 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
     public void setCharacterEncoding(String env) throws UnsupportedEncodingException {
         if (_request != null) {
             _request.setCharacterEncoding(env);
+        } else {
+            // charset part of Content-Type header
+            // Example: "Content-Type: text/html; charset=ISO-8859-4"
+            // see https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.17
+            //
+            final String mime = mime();
+            super.put(CONTENT_TYPE, mime + "; charset=" + env);
         }
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
@@ -600,7 +630,7 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
         if (_request != null) {
             return _request.getProtocol();
         } else {
-            return this.get(HeaderFramework.CONNECTION_PROP_HTTP_VER);
+            return super.get(HeaderFramework.CONNECTION_PROP_HTTP_VER, HeaderFramework.HTTP_VERSION_1_1);
         }
     }
 
@@ -687,16 +717,18 @@ public class RequestHeader extends HeaderFramework implements HttpServletRequest
     public void setAttribute(String name, Object o) {
         if (_request != null) {
             _request.setAttribute(name, o);
+        } else {
+            throw new UnsupportedOperationException("Not supported yet.");
         }
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
     public void removeAttribute(String name) {
         if (_request != null) {
             _request.removeAttribute(name);
+        } else {
+            throw new UnsupportedOperationException("Not supported yet.");
         }
-        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override

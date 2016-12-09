@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
+import javax.servlet.http.HttpServletRequest;
 
 import net.yacy.cora.document.encoding.UTF8;
 import net.yacy.cora.order.Base64Order;
@@ -51,7 +52,14 @@ import net.yacy.kelondro.util.kelondroException;
 import net.yacy.search.Switchboard;
 import net.yacy.search.SwitchboardConstants;
 
-
+/**
+ * Holds details of users that can login to YaCy, their rights and credentials.
+ * Caches succesfull login, holding cookie and/or ip information.
+ *
+ * In addition a systemadmin (static admin) account is available by default,
+ * included in the global Switchboard configuration.
+ *
+ */
 public final class UserDB {
     
     private static final int USERNAME_MIN_LENGTH = 4;
@@ -59,7 +67,7 @@ public final class UserDB {
     private MapHeap userTable;
     private final File userTableFile;
     private final Map<String, String> ipUsers = new HashMap<String, String>();
-    private final Map<String, Object> cookieUsers = new HashMap<String, Object>();
+    private final Map<String, Entry> cookieUsers = new HashMap<String, Entry>(); // mapping to identify user by a login cookie "login=<token>"
     
     public UserDB(final File userTableFile) throws IOException {
         this.userTableFile = userTableFile;
@@ -129,18 +137,21 @@ public final class UserDB {
     }    
 
     /**
-     * Use a ProxyAuth Value to authenticate user.
-     * @param auth base64 Encoded String, which contains "username:pw".
+     * Use a ProxyAuth Value to authenticate user from HttpHeader.Authentication.
+     * This supports only Basic authentication
+     * @param auth "BASIC " followed by base64 Encoded String, which contains "username:pw" for basic authentication
      */
-    public Entry proxyAuth(final String auth) {
+    public Entry proxyAuth(final String authHeader) {
         Entry entry = null;
-        
-        if (auth != null) {
-            final String[] tmp = Base64Order.standardCoder.decodeString(auth.trim()).split(":");
-            if (tmp.length == 2) {
-                entry = this.passwordAuth(tmp[0], tmp[1]);
-                if (entry == null) {
-                    entry = this.md5Auth(tmp[0], tmp[1]);
+        if (authHeader != null) {
+            if (authHeader.toUpperCase().startsWith(HttpServletRequest.BASIC_AUTH)) {
+                String auth = authHeader.substring(6); // take out prefix "BASIC"
+                final String[] tmp = Base64Order.standardCoder.decodeString(auth.trim()).split(":");
+                if (tmp.length == 2) {
+                    entry = this.passwordAuth(tmp[0], tmp[1]);
+                    if (entry == null) {
+                        entry = this.md5Auth(tmp[0], tmp[1]);
+                    }
                 }
             }
         }
@@ -219,6 +230,7 @@ public final class UserDB {
                 authok = md5pwd.equals(Digest.encodeMD5Hex(user + ":" + password));
             }
             if (authok) {
+                entry.updateLastAccess(false);
                 return entry;
             }
         }
@@ -237,6 +249,7 @@ public final class UserDB {
     public Entry md5Auth(final String user, final String md5) {
         final Entry entry = this.getEntry(user);
         if (entry != null && entry.getMD5EncodedUserPwd().endsWith(md5)) { // user pwd migth have prefix "MD5:"
+            entry.updateLastAccess(false);
             return entry;
             }
         return null;
@@ -245,35 +258,16 @@ public final class UserDB {
     public Entry cookieAuth(final String cookieString){
         final String token = getLoginToken(cookieString);
         if (cookieUsers.containsKey(token)) {
-            final Object entry = cookieUsers.get(token);
-            if (entry instanceof Entry) //String would mean static Admin
-                return (Entry)entry;
+            final Entry entry = cookieUsers.get(token);
+            return entry;
         }
         return null;
-    }
-    
-    public boolean cookieAdminAuth(final String cookieString){
-        final String token = getLoginToken(cookieString);
-        if (cookieUsers.containsKey(token)) {
-            final Object entry = cookieUsers.get(token);
-            if (entry instanceof String && entry.equals("admin")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public String getCookie(final Entry entry){
         final Random r = new Random();
         final String token = Long.toString(Math.abs(r.nextLong()), 36);
         cookieUsers.put(token, entry);
-        return token;
-    }
-
-    public String getAdminCookie(){
-        final Random r = new Random();
-        final String token = Long.toString(Math.abs(r.nextLong()), 36);
-        cookieUsers.put(token, "admin");
         return token;
     }
     
@@ -286,13 +280,6 @@ public final class UserDB {
             }
         }
         return "";
-    }
-    
-    public void adminLogout(final String logintoken){
-        if (cookieUsers.containsKey(logintoken)) {
-            //XXX: We could check, if its == "admin", but we want to logout anyway.
-            cookieUsers.remove(logintoken);
-        }
     }
 
     public enum AccessRight {
@@ -327,8 +314,8 @@ public final class UserDB {
     }
     
     public class Entry {
-        public static final String MD5ENCODED_USERPWD_STRING = "MD5_user:pwd";
-
+        public static final String MD5ENCODED_USERPWD_STRING = "MD5_user:pwd";  // value = "MD5:" + MD5Hex(username +":"+ realm + ":" pwd)
+                                                                                // oldstyle = MD5Hex(username +":"+ pwd)
         public static final String USER_FIRSTNAME = "firstName";
         public static final String USER_LASTNAME = "lastName";
         public static final String USER_ADDRESS = "address";
@@ -523,7 +510,10 @@ public final class UserDB {
             }
             return newTimeUsed;
         }
-        
+
+        /**
+         * @return encode credential = "MD5:" + MD5Hex(username +":"+ realm + ":" pwd) or null. (old style = MD5Hex(username +":"+ pwd)
+         */
         public String getMD5EncodedUserPwd() {
             return (this.mem.containsKey(MD5ENCODED_USERPWD_STRING)) ? this.mem.get(MD5ENCODED_USERPWD_STRING) : null;
         }

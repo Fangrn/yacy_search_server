@@ -54,6 +54,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.UnavailableException;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
@@ -65,13 +66,13 @@ import net.yacy.cora.order.Base64Order;
 import net.yacy.cora.protocol.Domains;
 import net.yacy.cora.protocol.HeaderFramework;
 import net.yacy.cora.protocol.RequestHeader;
+import net.yacy.cora.protocol.ResponseHeader;
 import net.yacy.cora.util.ByteBuffer;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.data.InvalidURLLicenceException;
-import net.yacy.data.UserDB.AccessRight;
-import net.yacy.data.UserDB.Entry;
 import net.yacy.kelondro.util.FileUtils;
 import net.yacy.kelondro.util.MemoryControl;
+import net.yacy.kelondro.util.NamePrefixThreadFactory;
 import net.yacy.peers.Seed;
 import net.yacy.peers.graphics.EncodedImage;
 import net.yacy.peers.operation.yacyBuildProperties;
@@ -151,7 +152,8 @@ public class YaCyDefaultServlet extends HttpServlet  {
     protected static final File TMPDIR = new File(System.getProperty("java.io.tmpdir"));
     protected static final int SIZE_FILE_THRESHOLD = 1024 * 1024 * 1024; // 1GB is a lot but appropriate for multi-document pushed using the push_p.json servlet
     protected static final FileItemFactory DISK_FILE_ITEM_FACTORY = new DiskFileItemFactory(SIZE_FILE_THRESHOLD, TMPDIR);
-    private final static TimeLimiter timeLimiter = new SimpleTimeLimiter(Executors.newCachedThreadPool());
+	private final static TimeLimiter timeLimiter = new SimpleTimeLimiter(Executors.newCachedThreadPool(
+			new NamePrefixThreadFactory(YaCyDefaultServlet.class.getSimpleName() + ".timeLimiter")));
     /* ------------------------------------------------------------ */
     @Override
     public void init() throws UnavailableException {
@@ -675,27 +677,6 @@ public class YaCyDefaultServlet extends HttpServlet  {
     protected Object invokeServlet(final File targetClass, final RequestHeader request, final serverObjects args) throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
         return rewriteMethod(targetClass).invoke(null, new Object[]{request, args, Switchboard.getSwitchboard()}); // add switchboard
     }
-
-    /**
-     * Convert ServletRequest header to YaCy RequestHeader
-     * @param request ServletRequest
-     * @return RequestHeader created from ServletRequest
-     * @deprecated use RequestHeader(HttpServletRequest); but .remove(key) can't be used after switch to new instance
-     */
-    @Deprecated // TODO: only used for proxy, should be handled there
-    public static RequestHeader convertHeaderFromJetty(HttpServletRequest request) {
-        RequestHeader result = new RequestHeader();
-        Enumeration<String> headerNames = request.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
-            Enumeration<String> headers = request.getHeaders(headerName);
-            while (headers.hasMoreElements()) {
-                String header = headers.nextElement();
-                result.add(headerName, header);
-            }
-        }
-        return result;
-    }
     
     /**
      * Returns the URL base for this peer, determined from request HTTP header "Host" when present. Use this when absolute URL rendering is required, 
@@ -756,31 +737,6 @@ public class YaCyDefaultServlet extends HttpServlet  {
 
         legacyRequestHeader.put(HeaderFramework.CONNECTION_PROP_PATH, target); // target may contain a server side include (SSI)
         legacyRequestHeader.put(HeaderFramework.CONNECTION_PROP_EXT, targetExt);
-        Switchboard sb = Switchboard.getSwitchboard();
-        if (legacyRequestHeader.containsKey(RequestHeader.AUTHORIZATION)) {
-            if (HttpServletRequest.BASIC_AUTH.equalsIgnoreCase(request.getAuthType())) {
-            } else {
-                // handle DIGEST auth for legacyHeader (create username:md5pwdhash
-                if (request.getUserPrincipal() != null) {
-                    String userpassEncoded = request.getHeader(RequestHeader.AUTHORIZATION); // e.g. "Basic AdminMD5hash"
-                    if (userpassEncoded != null) {
-                        if (request.isUserInRole(AccessRight.ADMIN_RIGHT.toString()) && !sb.getConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5,"").isEmpty()) {
-                            // fake admin authentication for legacyRequestHeader (as e.g. DIGEST is not supported by legacyRequestHeader)
-                            legacyRequestHeader.put(RequestHeader.AUTHORIZATION, HttpServletRequest.BASIC_AUTH + " "
-                                    + sb.getConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5, ""));
-                        } else {
-                            // fake Basic auth header for Digest auth  (Basic username:md5pwdhash)
-                            String username = request.getRemoteUser();
-                            Entry user = sb.userDB.getEntry(username);
-                            if (user != null) {
-                                legacyRequestHeader.put(RequestHeader.AUTHORIZATION, HttpServletRequest.BASIC_AUTH + " "
-                                        + username + ":" + user.getMD5EncodedUserPwd());
-                            }
-                        }
-                    }
-                }
-            }
-        }
         return legacyRequestHeader;
     }
 
@@ -914,7 +870,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 args.put(argName, request.getParameter(argName));
             }
             //TODO: for SSI request, local parameters are added as attributes, put them back as parameter for the legacy request
-            //      likely this should be implemented via httpservletrequestwrapper to supply complete parameters  
+            //      likely this should be implemented via httpservletrequestwrapper to supply complete parameters
             Enumeration<String> attNames = request.getAttributeNames();
             while (attNames.hasMoreElements()) {
                 String argName = attNames.nextElement();
@@ -1020,10 +976,29 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 templatePatterns = new servletProperties();
             } else if (tmp instanceof servletProperties) {
                 templatePatterns = (servletProperties) tmp;
+
+                if (templatePatterns.getOutgoingHeader() != null) {
+                    // handle responseHeader entries set by servlet
+                    ResponseHeader tmpouthdr = templatePatterns.getOutgoingHeader();
+                    for (String hdrkey : tmpouthdr.keySet()) {
+                        if (!HeaderFramework.STATUS_CODE.equals(hdrkey)) { // skip default init response status value (not std. )
+                            String val = tmpouthdr.get(hdrkey);
+                            if (!response.containsHeader(hdrkey) && val != null) { // to be on the safe side, add only new hdr (mainly used for CORS_ALLOW_ORIGIN)
+                                response.setHeader(hdrkey, tmpouthdr.get(hdrkey));
+                            }
+                        }
+                    }
+                    // handle login cookie
+                    if (tmpouthdr.getCookiesEntries() != null) {
+                        for (Cookie c : tmpouthdr.getCookiesEntries()) {
+                            response.addCookie(c);
+                        }
+                    }
+                }
             } else {
                 templatePatterns = new servletProperties((serverObjects) tmp);
             }
-     
+
             // handle YaCy http commands
             // handle action auth: check if the servlets requests authentication
             if (templatePatterns.containsKey(serverObjects.ACTION_AUTHENTICATE)) {
@@ -1064,7 +1039,7 @@ public class YaCyDefaultServlet extends HttpServlet  {
                 templatePatterns.put("newpeer", myPeer.getAge() >= 1 ? 0 : 1);
                 templatePatterns.putHTML("newpeer_peerhash", myPeer.hash);
                 boolean authorized = sb.adminAuthenticated(legacyRequestHeader) >= 2;
-                templatePatterns.put("authorized", authorized ? 1 : 0);
+                templatePatterns.put("authorized", authorized ? 1 : 0); // used in templates and other html (e.g. to display lock/unlock symbol)
 
                 templatePatterns.put("simpleheadernavbar", sb.getConfig("decoration.simpleheadernavbar", "navbar-default"));
                 

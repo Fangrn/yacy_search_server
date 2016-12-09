@@ -82,6 +82,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrInputDocument;
@@ -143,6 +144,7 @@ import net.yacy.data.BookmarksDB;
 import net.yacy.data.ListManager;
 import net.yacy.data.MessageBoard;
 import net.yacy.data.UserDB;
+import net.yacy.data.UserDB.AccessRight;
 import net.yacy.data.WorkTables;
 import net.yacy.data.wiki.WikiBoard;
 import net.yacy.data.wiki.WikiCode;
@@ -215,6 +217,8 @@ import net.yacy.utils.crypt;
 import net.yacy.utils.upnp.UPnP;
 import net.yacy.visualization.CircleTool;
 
+import com.cybozu.labs.langdetect.DetectorFactory;
+import com.cybozu.labs.langdetect.LangDetectException;
 import com.google.common.io.Files;
 
 
@@ -408,6 +412,14 @@ public final class Switchboard extends serverSwitch {
                 ProbabilisticClassifier.initialize(Switchboard.this.classificationPath);
             }
         }.start();
+        
+        // init the language detector
+        this.log.config("Loading language profiles");
+        try {
+			DetectorFactory.loadProfile(new File(appPath, "langdetect").toString());
+		} catch (LangDetectException e) {
+			ConcurrentLog.logException(e);
+		}
 
         // init global host name cache
         Domains.init(new File(this.workPath, "globalhosts.list"));
@@ -870,7 +882,8 @@ public final class Switchboard extends serverSwitch {
         
         // load the robots.txt db
         this.log.config("Initializing robots.txt DB");
-        this.robots = new RobotsTxt(this.tables, this.loader);
+		this.robots = new RobotsTxt(this.tables, this.loader,
+				this.getConfigInt(SwitchboardConstants.ROBOTS_TXT_THREADS_ACTIVE_MAX, SwitchboardConstants.ROBOTS_TXT_THREADS_ACTIVE_MAX_DEFAULT));
         try {
             this.log.config("Loaded robots.txt DB: " + this.robots.size() + " entries");
         } catch (final IOException e) {
@@ -1868,6 +1881,7 @@ public final class Switchboard extends serverSwitch {
         this.crawlStacker.announceClose();
         this.crawlStacker.close();
         this.crawlQueues.close();
+        this.robots.close();
         this.indexingDocumentProcessor.shutdown();
         this.indexingCondensementProcessor.shutdown();
         this.indexingAnalysisProcessor.shutdown();
@@ -2313,7 +2327,6 @@ public final class Switchboard extends serverSwitch {
                 && getConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5, "").isEmpty() ) {
                 // make a 'random' password, this will keep the ability to log in from localhost without password
                 setConfig(SwitchboardConstants.ADMIN_ACCOUNT_B64MD5, "0000" + this.genRandomPassword());
-                setConfig(SwitchboardConstants.ADMIN_ACCOUNT, "");
             }
 
             // stop greedylearning if limit is reached
@@ -3529,9 +3542,23 @@ public final class Switchboard extends serverSwitch {
             return 1;
         }
 
-        // security check against too long authorization strings
-        if ( realmValue.length() > 256 ) {
-            return 0;
+        if (HttpServletRequest.BASIC_AUTH.equalsIgnoreCase(requestHeader.getAuthType())) {
+            // security check against too long authorization strings (for BASIC auth)
+            if (realmValue.length() > 256) {
+                return 0;
+            }
+        } else {
+            // handle DIGEST auth by servlet container
+            if (requestHeader.getUserPrincipal() != null) { // user is authenticated (by Servlet container)
+                if (requestHeader.isUserInRole(AccessRight.ADMIN_RIGHT.toString())) {
+                    // we could double check admin right (but we trust embedded container)
+                    // String username = requestHeader.getUserPrincipal().getName();
+                    // if ((username.equalsIgnoreCase(sb.getConfig(SwitchboardConstants.ADMIN_ACCOUNT_USER_NAME, "admin")))
+                    //        || (sb.userDB.getEntry(username).hasRight(AccessRight.ADMIN_RIGHT)))
+                    adminAuthenticationLastAccess = System.currentTimeMillis();
+                    return 4; // has admin right
+                }
+            }
         }
 
         // authorization by encoded password, only for localhost access
@@ -3541,8 +3568,8 @@ public final class Switchboard extends serverSwitch {
             return 3; // soft-authenticated for localhost
         }
 
-        // authorization by hit in userDB (realm username:encodedpassword - handed over by DefaultServlet)
-        if ( this.userDB.hasAdminRight(realmValue, requestHeader.getHeaderCookies()) ) {
+        // authorization by hit in userDB (authtype username:encodedpassword - handed over by DefaultServlet)
+        if ( this.userDB.hasAdminRight(realmProp, requestHeader.getHeaderCookies()) ) {
             adminAuthenticationLastAccess = System.currentTimeMillis();
             return 4; //return, because 4=max
         }

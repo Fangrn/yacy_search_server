@@ -55,6 +55,7 @@ import net.yacy.cora.protocol.ConnectionInfo;
 import net.yacy.cora.protocol.Domains;
 import net.yacy.cora.protocol.HeaderFramework;
 import net.yacy.cora.util.Memory;
+import net.yacy.kelondro.util.NamePrefixThreadFactory;
 
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -118,7 +119,8 @@ public class HTTPClient {
 	private long upbytes = 0L;
 	private String host = null;
 	private final long timeout;
-	private static ExecutorService executor = Executors.newCachedThreadPool();
+	private static ExecutorService executor = Executors
+			.newCachedThreadPool(new NamePrefixThreadFactory(HTTPClient.class.getSimpleName() + ".execute"));
 
     public HTTPClient(final ClientIdentification.Agent agent) {
         super();
@@ -675,6 +677,7 @@ public class HTTPClient {
 	        assert !hrequest.expectContinue();
 	    }
 
+	    final String initialThreadName = Thread.currentThread().getName();
 	    Thread.currentThread().setName("HTTPClient-" + httpUriRequest.getURI());
         final long time = System.currentTimeMillis();
 	    try {
@@ -709,6 +712,9 @@ public class HTTPClient {
             throw new IOException("Client can't execute: "
             		+ (e.getCause() == null ? e.getMessage() : e.getCause().getMessage())
             		+ " duration=" + Long.toString(System.currentTimeMillis() - time) + " for url " + httpUriRequest.getURI().toString());
+        } finally {
+        	/* Restore the thread initial name */
+        	Thread.currentThread().setName(initialThreadName);
         }
     }
 

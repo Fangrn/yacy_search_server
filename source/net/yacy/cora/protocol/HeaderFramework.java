@@ -24,27 +24,21 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 
 import net.yacy.cora.document.encoding.ASCII;
 import net.yacy.cora.document.encoding.UTF8;
-import net.yacy.cora.document.id.DigestURL;
 import net.yacy.cora.util.CommonPattern;
 import net.yacy.cora.util.ConcurrentLog;
-import net.yacy.cora.util.NumberTools;
 
 
 /**
@@ -201,14 +195,14 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
     public static final String CONNECTION_PROP_METHOD = "METHOD";
     public static final String CONNECTION_PROP_PATH = "PATH";
     public static final String CONNECTION_PROP_EXT = "EXT";
-    public static final String CONNECTION_PROP_URL = "URL";
-    public static final String CONNECTION_PROP_ARGS = "ARGS";
+    // public static final String CONNECTION_PROP_ARGS = "ARGS"; // use getQueryString() or getParameter()
     public static final String CONNECTION_PROP_CLIENTIP = "CLIENTIP";
     public static final String CONNECTION_PROP_PERSISTENT = "PERSISTENT";
     public static final String CONNECTION_PROP_REQUEST_START = "REQUEST_START";
     public static final String CONNECTION_PROP_REQUEST_END = "REQUEST_END";
 
     /* PROPERTIES: Client -> Proxy */
+    public static final String CONNECTION_PROP_DIGESTURL = "URL"; // value DigestURL object
     public static final String CONNECTION_PROP_CLIENT_HTTPSERVLETREQUEST = "CLIENT_HTTPSERVLETREQUEST";
 
     /* PROPERTIES: Proxy -> Client */
@@ -246,11 +240,9 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
     private static final String PATTERN_RFC1123 = "EEE, dd MMM yyyy HH:mm:ss Z"; // with numeric time zone indicator as defined in RFC5322
     private static final String PATTERN_RFC1036 = "EEEE, dd-MMM-yy HH:mm:ss zzz";
     private static final String PATTERN_ANSIC   = "EEE MMM d HH:mm:ss yyyy";
-    private static final String PATTERN_GSAFS = "yyyy-MM-dd";
     public  static final SimpleDateFormat FORMAT_RFC1123      = new SimpleDateFormat(PATTERN_RFC1123, Locale.US);
     public  static final SimpleDateFormat FORMAT_RFC1036      = new SimpleDateFormat(PATTERN_RFC1036, Locale.US);
     public  static final SimpleDateFormat FORMAT_ANSIC        = new SimpleDateFormat(PATTERN_ANSIC, Locale.US);
-    public  static final SimpleDateFormat FORMAT_GSAFS        = new SimpleDateFormat(PATTERN_GSAFS, Locale.US);
     private static final TimeZone TZ_GMT = TimeZone.getTimeZone("GMT");
     private static final Calendar CAL_GMT = Calendar.getInstance(TZ_GMT, Locale.US);
 
@@ -282,22 +274,6 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
             lastRFC1123long = date.getTime();
             lastRFC1123string = s;
             return s;
-        }
-    }
-
-    public static final String formatGSAFS(final Date date) {
-        if (date == null) return "";
-        synchronized (FORMAT_GSAFS) {
-            final String s = FORMAT_GSAFS.format(date);
-            return s;
-        }
-    }
-    
-    public static final Date parseGSAFS(final String datestring) {
-        try {
-            return FORMAT_GSAFS.parse(datestring);
-        } catch (final ParseException e) {
-            return null;
         }
     }
 
@@ -355,6 +331,12 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
         return put("*" + key + "-" + Integer.toString(c), value);
     }
 
+    /**
+     * Count occurence of header keys, look for original header name and a
+     * numbered version of the header *headername-NUMBER , with NUMBER starting at 1
+     * @param key the raw header name
+     * @return number of headers with same name
+     */
     public int keyCount(final String key) {
         if (!(containsKey(key))) return 0;
         int c = 1;
@@ -370,15 +352,27 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
         return result;
     }
 
-    // return multiple results
+    /**
+     * Get one Header of headers with same name.
+     * The headers are internally numbered
+     * @param key the raw header name
+     * @param count the number of the numbered header name (0 = same as get(key))
+     * @return value of header with number=count
+     */
     public String getSingle(final String key, final int count) {
-        if (count == 0) return get(key, null);
-        return get("*" + key + "-" + count, null);
+        if (count == 0) return get(key); // first look for just the key
+        return get("*" + key + "-" + count); // now for the numbered header names
     }
 
-    public Object[] getMultiple(final String key) {
+    /**
+     * Get multiple header values with same header name.
+     * The header names are internally numbered (format *key-1)
+     * @param key the raw header name
+     * @return header values
+     */
+    public String[] getMultiple(final String key) {
         final int count = keyCount(key);
-        final Object[] result = new Object[count];
+        final String[] result = new String[count];
         for (int i = 0; i < count; i++) result[i] = getSingle(key, i);
         return result;
     }
@@ -507,14 +501,6 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
         return null;
     }
 
-    public static boolean supportChunkedEncoding(final Properties conProp) {
-    	// getting the http version of the client
-    	final String httpVer = conProp.getProperty(CONNECTION_PROP_HTTP_VER);
-
-    	// only clients with http version 1.1 supports chunk
-        return !(httpVer.equals(HTTP_VERSION_0_9) || httpVer.equals(HTTP_VERSION_1_0));
-    }
-
     public StringBuilder toHeaderString(
             final String httpVersion,
             final int httpStatusCode,
@@ -575,32 +561,6 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
     }
 
     /**
-     * Generate a url from Header properties
-     * @param conProp containing host, path, query and protocol (defaults to http if missing)
-     * @return url
-     * @throws MalformedURLException
-     */
-    public static DigestURL getRequestURL(final HashMap<String, Object> conProp) throws MalformedURLException {
-        String host =    (String) conProp.get(HeaderFramework.CONNECTION_PROP_HOST);
-        final String path =    (String) conProp.get(HeaderFramework.CONNECTION_PROP_PATH);     // always starts with leading '/'
-        final String args =    (String) conProp.get(HeaderFramework.CONNECTION_PROP_ARGS);     // may be null if no args were given
-        String protocol = (String) conProp.get(HeaderFramework.CONNECTION_PROP_PROTOCOL);
-        if (protocol == null) protocol = "http";
-        //String ip =      conProp.getProperty(httpHeader.CONNECTION_PROP_CLIENTIP); // the ip from the connecting peer
-
-        int port, pos;
-        if ((pos = host.lastIndexOf(':')) < 0 || host.charAt(pos - 1) != ']') {
-            port = Domains.stripToPort(protocol + "://" + host); // use stripToPort to get default ports
-        } else {
-            port = NumberTools.parseIntDecSubstring(host, pos + 1);
-            host = host.substring(0, pos);
-        }
-
-        final DigestURL url = new DigestURL(protocol, host, port, (args == null) ? path : path + "?" + args);
-        return url;
-    }
-
-    /**
      * Reading http headers from a reader class and building up a httpHeader object
      * @param reader the {@link BufferedReader} that is used to read the http header lines
      * @return a {@link HeaderFramework}-Object containing all parsed headers
@@ -618,157 +578,4 @@ public class HeaderFramework extends TreeMap<String, String> implements Map<Stri
             }
         }
     }
-
-
-    /*
-     * Patch BEGIN:
-     * Name: Header Property Patch
-     * Date: Fri. 13.01.2006
-     * Description: Makes possible to send header properties such as cookies back to the client.
-     * Part 1 of 5
-     * Questions: sergej.z@list.ru
-     */
-    /**
-     * Holds header properties
-     */
-    //Since properties such as cookies can be multiple, we cannot use HashMap here. We have to use Vector.
-    private Vector<Entry> headerProps = new Vector<Entry>();
-
-    /**
-     * Implementation of Map.Entry. Structure that hold two values - exactly what we need!
-     */
-    public static class Entry implements Map.Entry<String, String> {
-        private final String k;
-        private String v;
-        Entry(final String k, final String v) {
-            this.k = k;
-            this.v = v;
-        }
-        @Override
-        public String getKey() {
-            return this.k;
-        }
-        @Override
-        public String getValue() {
-            return this.v;
-        }
-        @Override
-        public String setValue(final String v) {
-            final String r = this.v;
-            this.v = v;
-            return r;
-        }
-    }
-
-    /**
-     * Sets Cookie on the client machine.
-     *
-     * @param name Cookie name
-     * @param value Cookie value
-     * @param expires when should this cookie be autmatically deleted. If <b>null</b> - cookie will stay forever
-     * @param path Path the cookie belongs to. Default - "/". Can be <b>null</b>.
-     * @param domain Domain this cookie belongs to. Default - domain name. Can be <b>null</b>.
-     * @param secure If true cookie will be send only over safe connection such as https
-     * @see further documentation: <a href="http://docs.sun.com/source/816-6408-10/cookies.htm">docs.sun.com</a>
-     */
-    public void setCookie(final String name, final String value, final String expires, final String path, final String domain, final boolean secure)
-    {
-         /*
-         * TODO:Here every value can be validated for correctness if needed
-         * For example semicolon should be not in any of the values
-         * However an exception in this case would be an overhead IMHO.
-         */
-        String cookieString = name + "=" + value + ";";
-        if (expires != null) cookieString += " expires=" + expires + ";";
-        if (path != null) cookieString += " path=" + path + ";";
-        if (domain != null) cookieString += " domain=" + domain + ";";
-        if (secure) cookieString += " secure;";
-        this.headerProps.add(new Entry("Set-Cookie", cookieString));
-    }
-    /**
-     * Sets Cookie on the client machine.
-     *
-     * @param name Cookie name
-     * @param value Cookie value
-     * @param expires when should this cookie be automatically deleted. If <b>null</b> - cookie will stay forever
-     * @param path Path the cookie belongs to. Default - "/". Can be <b>null</b>.
-     * @param domain Domain this cookie belongs to. Default - domain name. Can be <b>null</b>.
-     *
-     * Note: this cookie will be sent over each connection independent if it is safe connection or not.
-     * @see further documentation: <a href="http://docs.sun.com/source/816-6408-10/cookies.htm">docs.sun.com</a>
-     */
-    public void setCookie(final String name, final String value, final String expires, final String path, final String domain)
-    {
-        setCookie( name,  value,  expires,  path,  domain, false);
-    }
-    /**
-     * Sets Cookie on the client machine.
-     *
-     * @param name Cookie name
-     * @param value Cookie value
-     * @param expires when should this cookie be automatically deleted. If <b>null</b> - cookie will stay forever
-     * @param path Path the cookie belongs to. Default - "/". Can be <b>null</b>.
-     *
-     * Note: this cookie will be sent over each connection independent if it is safe connection or not.
-     * @see further documentation: <a href="http://docs.sun.com/source/816-6408-10/cookies.htm">docs.sun.com</a>
-     */
-    public void setCookie(final String name, final String value, final String expires, final String path)
-    {
-        setCookie( name,  value,  expires,  path,  null, false);
-    }
-    /**
-     * Sets Cookie on the client machine.
-     *
-     * @param name Cookie name
-     * @param value Cookie value
-     * @param expires when should this cookie be automatically deleted. If <b>null</b> - cookie will stay forever
-     *
-     * Note: this cookie will be sent over each connection independent if it is safe connection or not.
-     * @see further documentation: <a href="http://docs.sun.com/source/816-6408-10/cookies.htm">docs.sun.com</a>
-     */
-    public void setCookie(final String name, final String value, final String expires)
-    {
-        setCookie( name,  value,  expires,  null,  null, false);
-    }
-    /**
-     * Sets Cookie on the client machine.
-     *
-     * @param name Cookie name
-     * @param value Cookie value
-     *
-     * Note: this cookie will be sent over each connection independent if it is safe connection or not. This cookie never expires
-     * @see further documentation: <a href="http://docs.sun.com/source/816-6408-10/cookies.htm">docs.sun.com</a>
-     */
-    public void setCookie(final String name, final String value )
-    {
-        setCookie( name,  value,  null,  null,  null, false);
-    }
-
-    /**
-     * Gets the header entry "Cookie"
-     * 
-     * @return String with cookies separated by ';'
-     */
-    public String getHeaderCookies(){
-        final Iterator<Map.Entry<String, String>> it = entrySet().iterator();
-        while(it.hasNext())
-        {
-            final Map.Entry<String, String> e = it.next();
-            //System.out.println(""+e.getKey()+" : "+e.getValue());
-            if(e.getKey().equals("Cookie"))
-            {
-                return e.getValue();
-            }
-        }
-        return "";
-    }
-
-    public Vector<Entry> getAdditionalHeaderProperties() {
-        return this.headerProps;
-    }
-
-    /*
-     * Patch END:
-     * Name: Header Property Patch
-     */
 }
