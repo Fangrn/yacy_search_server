@@ -120,7 +120,8 @@ public class ContentScraper extends AbstractScraper implements Scraper {
         script(TagType.pair),
         span(TagType.pair),
         div(TagType.pair),
-        article(TagType.pair),
+        article(TagType.pair), // html5
+        time(TagType.pair), // html5 <time datetime>
         // tags used to capture tag content
         // TODO: considere to use </head> or <body> as trigger to scape for text content
         style(TagType.pair); // embedded css (if not declared as tag content is parsed as text)
@@ -299,29 +300,29 @@ public class ContentScraper extends AbstractScraper implements Scraper {
                 if (newtext[r] == ' ') {
                     r--;
                     if (newtext[r] == 'N') {
-                        this.lat =  Float.parseFloat(new String(newtext, r + 2, p - r - 2)) +
-                                    Float.parseFloat(new String(newtext, p + pl + 1, q - p - pl - 1)) / 60.0d;
+                        this.lat =  Double.parseDouble(new String(newtext, r + 2, p - r - 2)) +
+                                    Double.parseDouble(new String(newtext, p + pl + 1, q - p - pl - 1)) / 60.0d;
                         if (this.lon != 0.0d) break location;
                         s = q + 6;
                         continue location;
                     }
                     if (newtext[r] == 'S') {
-                        this.lat = -Float.parseFloat(new String(newtext, r + 2, p - r - 2)) -
-                                    Float.parseFloat(new String(newtext, p + pl + 1, q - p - pl - 1)) / 60.0d;
+                        this.lat = -Double.parseDouble(new String(newtext, r + 2, p - r - 2)) -
+                                    Double.parseDouble(new String(newtext, p + pl + 1, q - p - pl - 1)) / 60.0d;
                         if (this.lon != 0.0d) break location;
                         s = q + 6;
                         continue location;
                     }
                     if (newtext[r] == 'E') {
-                        this.lon =  Float.parseFloat(new String(newtext, r + 2, p - r - 2)) +
-                                    Float.parseFloat(new String(newtext, p + pl + 1, q - p - pl - 1)) / 60.0d;
+                        this.lon =  Double.parseDouble(new String(newtext, r + 2, p - r - 2)) +
+                                    Double.parseDouble(new String(newtext, p + pl + 1, q - p - pl - 1)) / 60.0d;
                         if (this.lat != 0.0d) break location;
                         s = q + 6;
                         continue location;
                     }
                     if (newtext[r] == 'W') {
-                        this.lon = -Float.parseFloat(new String(newtext, r + 2, p - r - 2)) -
-                                    Float.parseFloat(new String(newtext, p + 2, q - p - pl - 1)) / 60.0d;
+                        this.lon = -Double.parseDouble(new String(newtext, r + 2, p - r - 2)) -
+                                    Double.parseDouble(new String(newtext, p + 2, q - p - pl - 1)) / 60.0d;
                         if (this.lat != 0.0d) break location;
                         s = q + 6;
                         continue location;
@@ -395,22 +396,37 @@ public class ContentScraper extends AbstractScraper implements Scraper {
         final String classprop = tag.opts.getProperty("class", EMPTY_STRING);
         this.vocabularyScraper.check(this.root, classprop, tag.content);
         
-        // itemprop
+        // itemprop (schema.org)
         String itemprop = tag.opts.getProperty("itemprop");
         if (itemprop != null) {
-            String propval = tag.opts.getProperty("content");
-            if (propval == null) propval = tag.opts.getProperty("datetime"); // html5 example: <time itemprop="startDate" datetime="2016-01-26">today</time> while each prop is optional
-            if (propval != null) {
-                if ("startDate".equals(itemprop)) try {
-                    // parse ISO 8601 date
-                    Date startDate = ISO8601Formatter.FORMATTER.parse(propval, this.timezoneOffset).getTime();
-                    this.startDates.add(startDate);
-                } catch (ParseException e) {}
-                if ("endDate".equals(itemprop)) try {
-                    // parse ISO 8601 date
-                    Date endDate = ISO8601Formatter.FORMATTER.parse(propval, this.timezoneOffset).getTime();
-                    this.endDates.add(endDate);
-                } catch (ParseException e) {}
+            String propval = tag.opts.getProperty("content"); // value for <meta itemprop="" content=""> see https://html.spec.whatwg.org/multipage/microdata.html#values
+            if (propval == null) propval = tag.opts.getProperty("datetime"); // html5 + schema.org#itemprop example: <time itemprop="startDate" datetime="2016-01-26">today</time> while each prop is optional
+            if (propval != null) {                                           // html5 example: <time datetime="2016-01-26">today</time> while each prop is optional
+                // check <itemprop with value="" > (schema.org)
+                switch (itemprop) {
+                    // <meta> itemprops of main element with microdata <div itemprop="geo" itemscope itemtype="http://schema.org/GeoCoordinates">
+                    case "latitude": // <meta itemprop="latitude" content="47.2649990" />
+                        this.lat = Double.parseDouble(propval); // TODO: possibly overwrite existing value (multiple coordinates in document)
+                        break;                                  // TODO: risk to mix up existing coordinate if longitude not given too
+                    case "longitude": // <meta itemprop="longitude" content="11.3428720" />
+                        this.lon = Double.parseDouble(propval); // TODO: possibly overwrite existing value (multiple coordinates in document)
+                        break;                                  // TODO: risk to mix up existing coordinate if latitude not given too
+
+                    case "startDate": // <meta itemprop="startDate" content="2016-04-21T20:00">
+                        try {
+                            // parse ISO 8601 date
+                            Date startDate = ISO8601Formatter.FORMATTER.parse(propval, this.timezoneOffset).getTime();
+                            this.startDates.add(startDate);
+                        } catch (ParseException e) {}
+                        break;
+                    case "endDate":
+                        try {
+                            // parse ISO 8601 date
+                            Date endDate = ISO8601Formatter.FORMATTER.parse(propval, this.timezoneOffset).getTime();
+                            this.endDates.add(endDate);
+                        } catch (ParseException e) {}
+                        break;
+                }
             }
         }
     }
@@ -645,7 +661,7 @@ public class ContentScraper extends AbstractScraper implements Scraper {
             if ((href.length() > 0) && ((url = absolutePath(href)) != null)) {
                 if (followDenied()) {
                     String rel = tag.opts.getProperty("rel", EMPTY_STRING);
-                    if (rel.length() == 0) rel = "nofollow"; else if (rel.indexOf("nofollow") < 0) rel += ",nofollow"; 
+                    if (rel.length() == 0) rel = "nofollow"; else if (rel.indexOf("nofollow") < 0) rel += ",nofollow";
                     tag.opts.put("rel", rel);
                 }
                 tag.opts.put("text", stripAllTags(tag.content.getChars())); // strip any inline html in tag text like  "<a ...> <span>test</span> </a>"
@@ -724,6 +740,14 @@ public class ContentScraper extends AbstractScraper implements Scraper {
         } else if (tag.name.equalsIgnoreCase("article")) {
             h = cleanLine(CharacterCoding.html2unicode(stripAllTags(tag.content.getChars())));
             if (h.length() > 0) this.articles.add(h);
+        } else if (tag.name.equalsIgnoreCase(TagName.time.name())) { // html5 tag <time datetime="2016-12-23">Event</time>
+            h = tag.opts.getProperty("datetime"); // TODO: checkOpts() also parses datetime property if in combination with schema.org itemprop=startDate/endDate
+            if (h != null) { // datetime property is optional
+                try {
+                    Date startDate = ISO8601Formatter.FORMATTER.parse(h, this.timezoneOffset).getTime();
+                    this.startDates.add(startDate);
+                } catch (ParseException ex) { }
+            }
         }
 
         // fire event

@@ -30,6 +30,9 @@
         </select>
     	&nbsp;&nbsp;<input type="submit" name="downloadRelease" class="btn btn-primary" value="Download Release"/>
     	&nbsp;&nbsp;<input type="submit" name="checkRelease" class="btn btn-default" value="Check for new Release"/>
+        #(downloadError)#::
+        <div class="error">Download of release #[releasedownload]# failed.</div>
+        #(/downloadError)#
       </p></form></dd>
       <dt><br />Downloaded Releases</dt>
       <dd><form action="ConfigUpdate_p.html" method="get" accept-charset="UTF-8"><p>
@@ -55,7 +58,8 @@
         <div class="commit">Download of release #[downloadedRelease]# finished. Restart Initiated.</div>::
         <div class="error">No more recent release found.</div>::
         <div class="error">Omitting update because this is a development environment.</div>::
-        <div class="error">Omitting update because download of release #[downloadedRelease]# failed.</div>
+        <div class="error">Omitting update because download of release #[downloadedRelease]# failed.</div>::
+        <div class="error">Omitting update because an error occurred while trying to deploy the release.</div>
         #(/autoUpdate)#
       </p></form></dd>
       </dl>

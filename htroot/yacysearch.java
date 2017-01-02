@@ -171,6 +171,7 @@ public class yacysearch {
             prop.put("indexof", "off");
             prop.put("constraint", "");
             prop.put("depth", "0");
+            prop.put("localQuery", "0");
             prop.put(
                 "search.verify",
                 (post == null) ? sb.getConfig("search.verify", "iffresh") : post.get("verify", "iffresh"));
@@ -527,6 +528,7 @@ public class yacysearch {
                     // delete the index entry locally
                     final String delHash = post.get("deleteref", ""); // urlhash
                     if (indexSegment.termIndex() != null) indexSegment.termIndex().remove(qg.getIncludeHashes(), delHash.getBytes());
+                    indexSegment.fulltext().remove(delHash.getBytes());
 
                     // make new news message with negative voting
                     if ( !sb.isRobinsonMode() ) {
@@ -849,6 +851,7 @@ public class yacysearch {
             }
 
             prop.put("depth", "0");
+            prop.put("localQuery", theSearch.query.isLocal() ? "1" : "0");
 
         }
         prop.put("focus", focus ? 1 : 0); // focus search field

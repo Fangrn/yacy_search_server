@@ -129,8 +129,6 @@ import com.google.common.util.concurrent.UncheckedTimeoutException;
  * 
  *  resourceBase      Set to replace the context resource base
  *
- *  pathInfoOnly      If true, only the path info will be applied to the resourceBase
- *
  * </PRE>
  */
 public class YaCyDefaultServlet extends HttpServlet  {
@@ -139,7 +137,6 @@ public class YaCyDefaultServlet extends HttpServlet  {
     protected ServletContext _servletContext;
     protected boolean _acceptRanges = true;
     protected boolean _dirAllowed = true;
-    protected boolean _pathInfoOnly = false;
     protected Resource _resourceBase;
     protected MimeTypes _mimeTypes;
     protected String[] _welcomes;    
@@ -172,7 +169,6 @@ public class YaCyDefaultServlet extends HttpServlet  {
         }
         _acceptRanges = getInitBoolean("acceptRanges", _acceptRanges);
         _dirAllowed = getInitBoolean("dirAllowed", _dirAllowed);
-        _pathInfoOnly = getInitBoolean("pathInfoOnly", _pathInfoOnly);
 
         Resource.setDefaultUseCaches(false); // caching is handled internally (prevent double caching)
 
@@ -245,19 +241,15 @@ public class YaCyDefaultServlet extends HttpServlet  {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String servletPath;
         String pathInfo; 
         Enumeration<String> reqRanges = null;
-        boolean included = request.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) != null; 
+        boolean included = request.getAttribute(RequestDispatcher.INCLUDE_REQUEST_URI) != null;
         if (included) {
-            servletPath = (String) request.getAttribute(RequestDispatcher.INCLUDE_SERVLET_PATH);
             pathInfo = (String) request.getAttribute(RequestDispatcher.INCLUDE_PATH_INFO);
-            if (servletPath == null) {
-                servletPath = request.getServletPath();
+            if (pathInfo == null) {
                 pathInfo = request.getPathInfo();
             }
         } else {
-            servletPath = _pathInfoOnly ? "/" : request.getServletPath();
             pathInfo = request.getPathInfo();
 
             // Is this a Range request?
@@ -267,8 +259,8 @@ public class YaCyDefaultServlet extends HttpServlet  {
             }
         }
         
-        String pathInContext = URIUtil.addPaths(servletPath, pathInfo);
-        boolean endsWithSlash = (pathInfo == null ? request.getServletPath() : pathInfo).endsWith(URIUtil.SLASH);
+        String pathInContext =  pathInfo == null ? "/" : pathInfo; // this is the path of the resource in _resourceBase (= path within htroot respective htDocs)
+        boolean endsWithSlash = pathInContext.endsWith(URIUtil.SLASH);
 
         // Find the resource 
         Resource resource = null;
@@ -863,18 +855,11 @@ public class YaCyDefaultServlet extends HttpServlet  {
         
         if ((targetClass != null)) {
             serverObjects args = new serverObjects();
-            Enumeration<String> argNames = request.getParameterNames();
+            Enumeration<String> argNames = request.getParameterNames(); // on ssi jetty dispatcher merged local ssi query parameters
             while (argNames.hasMoreElements()) {
                 String argName = argNames.nextElement();
                 // standard attributes are just pushed as string
                 args.put(argName, request.getParameter(argName));
-            }
-            //TODO: for SSI request, local parameters are added as attributes, put them back as parameter for the legacy request
-            //      likely this should be implemented via httpservletrequestwrapper to supply complete parameters
-            Enumeration<String> attNames = request.getAttributeNames();
-            while (attNames.hasMoreElements()) {
-                String argName = attNames.nextElement();
-                args.put(argName, request.getAttribute(argName).toString());
             }
             RequestHeader legacyRequestHeader = generateLegacyRequestHeader(request, target, targetExt);
             // add multipart-form fields to parameter

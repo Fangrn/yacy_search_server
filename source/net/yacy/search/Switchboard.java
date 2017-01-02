@@ -116,7 +116,6 @@ import net.yacy.cora.protocol.ConnectionInfo;
 import net.yacy.cora.protocol.Domains;
 import net.yacy.cora.protocol.RequestHeader;
 import net.yacy.cora.protocol.TimeoutRequest;
-import net.yacy.cora.protocol.ftp.FTPClient;
 import net.yacy.cora.protocol.http.HTTPClient;
 import net.yacy.cora.protocol.http.ProxySettings;
 import net.yacy.cora.util.CommonPattern;
@@ -1873,6 +1872,10 @@ public final class Switchboard extends serverSwitch {
     
     public synchronized void close() {
         this.log.config("SWITCHBOARD SHUTDOWN STEP 1: sending termination signal to managed threads:");
+        /* Print also to the standard output : when this method is triggered by the shutdown hook thread, the LogManager is likely to have
+         * been concurrently reset by its own shutdown hook thread */
+        System.out.println("SWITCHBOARD Performing shutdown steps...");
+        
         MemoryTracker.stopSystemProfiling();
         terminateAllThreads(true);
         net.yacy.gui.framework.Switchboard.shutdown();
@@ -1916,6 +1919,9 @@ public final class Switchboard extends serverSwitch {
             ConcurrentLog.logException(e);
         }
         this.log.config("SWITCHBOARD SHUTDOWN TERMINATED");
+        /* Print also to the standard output : when this method is triggered by the shutdown hook thread, the LogManager is likely to have
+         * been concurrently reset by its own shutdown hook thread */
+        System.out.println("SWITCHBOARD Shutdown steps terminated.");
     }
 
     /**
@@ -2498,9 +2504,13 @@ public final class Switchboard extends serverSwitch {
                     this.log
                         .info("AUTO-UPDATE: omitting update because download failed (file cannot be found, is too small or signature is bad)");
                 } else {
-                    yacyRelease.deployRelease(downloaded);
-                    terminate(10, "auto-update to install " + downloaded.getName());
-                    this.log.info("AUTO-UPDATE: deploy and restart initiated");
+                    if(yacyRelease.deployRelease(downloaded)) {
+                    	terminate(10, "auto-update to install " + downloaded.getName());
+                    	this.log.info("AUTO-UPDATE: deploy and restart initiated");
+                    } else {
+                        this.log
+                        .info("AUTO-UPDATE: omitting update because an error occurred while trying to deploy the release.");
+                    }
                 }
             }
 
@@ -3219,17 +3229,12 @@ public final class Switchboard extends serverSwitch {
         if (url.isFTP()) {
             try {
                 this.crawler.putActive(handle, profile);
-                String userInfo = url.getUserInfo();
-                int p = userInfo == null ? -1 : userInfo.indexOf(':');
-                String user = userInfo == null ? FTPClient.ANONYMOUS : userInfo.substring(0, p);
-                String pw = userInfo == null || p == -1 ? "anomic" : userInfo.substring(p + 1);
+                /* put ftp site entries on the crawl stack, 
+                 * using the crawl profile depth to control how many children folders of the url are stacked */
                 this.crawlStacker.enqueueEntriesFTP(
                         this.peers.mySeed().hash.getBytes(),
-                        profile.handle(),
-                        url.getHost(),
-                        url.getPort(),
-                        user,
-                        pw,
+                        profile,
+                        url,
                         false,
                         profile.timezoneOffset());
                 return null;
@@ -3569,7 +3574,7 @@ public final class Switchboard extends serverSwitch {
         }
 
         // authorization by hit in userDB (authtype username:encodedpassword - handed over by DefaultServlet)
-        if ( this.userDB.hasAdminRight(realmProp, requestHeader.getHeaderCookies()) ) {
+        if ( this.userDB.hasAdminRight(realmProp, requestHeader.getCookies()) ) {
             adminAuthenticationLastAccess = System.currentTimeMillis();
             return 4; //return, because 4=max
         }
@@ -4032,6 +4037,11 @@ public final class Switchboard extends serverSwitch {
         }
     }
 
+    /**
+     * Triggers asynchronous shutdown occurring after a given delay
+     * @param delay delay time in milliseconds
+     * @param reason shutdown reason for log information
+     */
     public void terminate(final long delay, final String reason) {
         if ( delay <= 0 ) {
             throw new IllegalArgumentException("The shutdown delay must be greater than 0.");

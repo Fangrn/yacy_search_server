@@ -68,13 +68,11 @@ import net.yacy.cora.sorting.WeakPriorityBlockingQueue.ReverseElement;
 import net.yacy.cora.storage.HandleSet;
 import net.yacy.cora.util.ConcurrentLog;
 import net.yacy.cora.util.SpaceExceededException;
-import net.yacy.crawler.CrawlSwitchboard;
 import net.yacy.crawler.retrieval.Response;
 import net.yacy.data.WorkTables;
 import net.yacy.document.LargeNumberCache;
 import net.yacy.document.LibraryProvider;
 import net.yacy.document.ProbabilisticClassifier;
-import net.yacy.document.TextParser;
 import net.yacy.document.Tokenizer;
 import net.yacy.kelondro.data.meta.URIMetadataNode;
 import net.yacy.kelondro.data.word.Word;
@@ -98,11 +96,8 @@ import net.yacy.search.EventTracker;
 import net.yacy.search.Switchboard;
 import net.yacy.search.SwitchboardConstants;
 import net.yacy.search.index.Segment;
-import net.yacy.search.navigator.NameSpaceNavigator;
 import net.yacy.search.navigator.Navigator;
-import net.yacy.search.navigator.RestrictedStringNavigator;
-import net.yacy.search.navigator.StringNavigator;
-import net.yacy.search.navigator.YearNavigator;
+import net.yacy.search.navigator.NavigatorPlugins;
 import net.yacy.search.ranking.ReferenceOrder;
 import net.yacy.search.schema.CollectionConfiguration;
 import net.yacy.search.schema.CollectionSchema;
@@ -146,12 +141,13 @@ public final class SearchEvent {
     private byte[] IAmaxcounthash, IAneardhthash;
     public Thread rwiProcess;
     public Thread localsolrsearch;
+    /** Offset of the next local Solr index request
+     * Example : last local request with offset=10 and itemsPerPage=20, sets this attribute to 30. */
     private int localsolroffset;
     private final AtomicInteger expectedRemoteReferences, maxExpectedRemoteReferences; // counter for referenced that had been sorted out for other reasons
     public final ScoreMap<String> locationNavigator; // a counter for the appearance of location coordinates
     public final ScoreMap<String> hostNavigator; // a counter for the appearance of host names
     public final ScoreMap<String> protocolNavigator; // a counter for protocol types
-    public final ScoreMap<String> filetypeNavigator; // a counter for file types
     public final ScoreMap<String> dateNavigator; // a counter for file types
     public final ScoreMap<String> languageNavigator; // a counter for appearance of languages
     public final Map<String, ScoreMap<String>> vocabularyNavigator; // counters for Vocabularies; key is metatag.getVocabularyName()
@@ -264,57 +260,12 @@ public final class SearchEvent {
         this.locationNavigator = navcfg.contains("location") ? new ConcurrentScoreMap<String>() : null;
         this.hostNavigator = navcfg.contains("hosts") ? new ConcurrentScoreMap<String>() : null;
         this.protocolNavigator = navcfg.contains("protocol") ? new ConcurrentScoreMap<String>() : null;
-        this.filetypeNavigator = navcfg.contains("filetype") ? new ConcurrentScoreMap<String>() : null;
         this.dateNavigator = navcfg.contains("date") ? new ClusteredScoreMap<String>(true) : null;
         this.topicNavigatorCount = navcfg.contains("topics") ? MAX_TOPWORDS : 0;
         this.languageNavigator = navcfg.contains("language") ? new ConcurrentScoreMap<String>() : null;
         this.vocabularyNavigator = new TreeMap<String, ScoreMap<String>>();
         // prepare configured search navigation (plugins)
-        this.navigatorPlugins = new LinkedHashMap<String, Navigator>();
-        String[] navnames = navcfg.split(",");
-        for (String navname : navnames) {
-            if (navname.contains("authors")) {
-                this.navigatorPlugins.put("authors", new StringNavigator("Authors", CollectionSchema.author_sxt));
-            }
-            if (navname.contains("collections")) {
-                RestrictedStringNavigator tmpnav = new RestrictedStringNavigator("Collection", CollectionSchema.collection_sxt);
-                // exclude default internal collection names
-                tmpnav.addForbidden("dht");
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_AUTOCRAWL_DEEP);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_AUTOCRAWL_SHALLOW);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_PROXY);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_REMOTE);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_SNIPPET_LOCAL_TEXT);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_SNIPPET_GLOBAL_TEXT);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_GREEDY_LEARNING_TEXT);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_SNIPPET_LOCAL_MEDIA);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_SNIPPET_GLOBAL_MEDIA);
-                tmpnav.addForbidden("robot_" + CrawlSwitchboard.CRAWL_PROFILE_SURROGATE);
-                this.navigatorPlugins.put("collections", tmpnav);
-            }
-            if (navname.contains("namespace")) {
-                this.navigatorPlugins.put("namespace", new NameSpaceNavigator("Name Space"));
-            }
-            // YearNavigator with possible def of :fieldname:title in configstring
-            if (navname.contains("year")) {
-                if ((navname.indexOf(':')) > 0) { // example "year:dates_in_content_dts:Events"
-                    String[] navfielddef = navname.split(":");
-                    try {
-                        // year:fieldname:title
-                        CollectionSchema field = CollectionSchema.valueOf(navfielddef[1]);
-                        if (navfielddef.length > 2) {
-                            this.navigatorPlugins.put(navfielddef[1], new YearNavigator(navfielddef[2], field));
-                        } else {
-                            this.navigatorPlugins.put(navfielddef[1], new YearNavigator("Year-" + navfielddef[1], field));
-                        }
-                    } catch (java.lang.IllegalArgumentException ex) {
-                        log.severe("wrong navigator name in config: \"" + navname + "\" " + ex.getMessage());
-                    }
-                } else { // "year" only use default last_modified
-                    this.navigatorPlugins.put("year", new YearNavigator("Year", CollectionSchema.last_modified));
-                }
-            }
-        }
+        this.navigatorPlugins = NavigatorPlugins.initFromCfgString(navcfg);
 
         this.snippets = new ConcurrentHashMap<String, LinkedHashSet<String>>(); 
         this.secondarySearchSuperviser = (this.query.getQueryGoal().getIncludeHashes().size() > 1) ? new SecondarySearchSuperviser(this) : null; // generate abstracts only for combined searches
@@ -371,9 +322,9 @@ public final class SearchEvent {
 
         // start a local solr search
         if (!Switchboard.getSwitchboard().getConfigBool(SwitchboardConstants.DEBUG_SEARCH_LOCAL_SOLR_OFF, false)) {
-            this.localsolrsearch = RemoteSearch.solrRemoteSearch(this, this.query.solrQuery(this.query.contentdom, true, this.excludeintext_image), 0, this.query.itemsPerPage, null /*this peer*/, 0, Switchboard.urlBlacklist);
+            this.localsolrsearch = RemoteSearch.solrRemoteSearch(this, this.query.solrQuery(this.query.contentdom, true, this.excludeintext_image), this.query.offset, this.query.itemsPerPage, null /*this peer*/, 0, Switchboard.urlBlacklist);
         }
-        this.localsolroffset = this.query.itemsPerPage;
+        this.localsolroffset = this.query.offset + this.query.itemsPerPage;
         
         // start a local RWI search concurrently
         this.rwiProcess = null;
@@ -896,27 +847,6 @@ public final class SearchEvent {
                     if (host.startsWith("www.")) host = host.substring(4);
                     this.hostNavigator.inc(host, hc);
                 }
-            }
-        }
-
-        if (this.filetypeNavigator != null) {
-            fcts = facets.get(CollectionSchema.url_file_ext_s.getSolrFieldName());
-            if (fcts != null) {
-                // remove all filetypes that we don't know
-                Iterator<String> i = fcts.iterator();
-                while (i.hasNext()) {
-                    String ext = i.next();
-                    if (this.query.contentdom == ContentDomain.TEXT) {
-                        if ((Classification.isImageExtension(ext) && this.excludeintext_image) ||
-                            (TextParser.supportsExtension(ext) != null && !Classification.isAnyKnownExtension(ext))) {
-                            //Log.logInfo("SearchEvent", "removed unknown extension " + ext + " from navigation.");
-                            i.remove();
-                        }
-                    } else { // for image and media search also limit to known extension
-                        if (!Classification.isAnyKnownExtension(ext)) i.remove();
-                    }
-                }
-                this.filetypeNavigator.inc(fcts);
             }
         }
 
@@ -1624,31 +1554,68 @@ public final class SearchEvent {
         // (happens if a search pages is accessed a second time)
         final long finishTime = timeout == Long.MAX_VALUE ? Long.MAX_VALUE : System.currentTimeMillis() + timeout;
         EventTracker.update(EventTracker.EClass.SEARCH, new ProfilingGraph.EventSearch(this.query.id(true), SearchEventType.ONERESULT, "started, item = " + item + ", available = " + this.getResultCount(), 0, 0), false);
+		
         // wait until a local solr is finished, we must do that to be able to check if we need more
-        if (this.localsolrsearch != null && this.localsolrsearch.isAlive()) {try {this.localsolrsearch.join(100);} catch (final InterruptedException e) {}}
-        if (item >= this.localsolroffset && this.local_solr_stored.get() == 0 && this.localsolrsearch.isAlive()) {try {this.localsolrsearch.join();} catch (final InterruptedException e) {}}
-        if (item >= this.localsolroffset && this.local_solr_stored.get() >= item) {
-            // load remaining solr results now
+		if (this.localsolrsearch != null && this.localsolrsearch.isAlive()) {
+			try {
+				this.localsolrsearch.join(100);
+			} catch (final InterruptedException e) {
+				log.warn("Wait for local solr search was interrupted.");
+			}
+		}
+		if (item >= this.localsolroffset && this.local_solr_stored.get() == 0 && this.localsolrsearch.isAlive()) {
+			try {
+				this.localsolrsearch.join();
+			} catch (final InterruptedException e) {
+				log.warn("Wait for local solr search was interrupted.");
+			}
+		}
+        if (this.remote && item >= this.localsolroffset && this.local_solr_stored.get() >= item) {
+			/* Request mixing remote and local Solr results : load remaining local solr results now. 
+			 * For local only search, a new SearchEvent should be created, starting directly at the requested offset,
+			 * thus allowing to handle last pages of large resultsets
+			 */
             int nextitems = item - this.localsolroffset + this.query.itemsPerPage; // example: suddenly switch to item 60, just 10 had been shown, 20 loaded.
             if (this.localsolrsearch != null && this.localsolrsearch.isAlive()) {try {this.localsolrsearch.join();} catch (final InterruptedException e) {}}
-            if (!Switchboard.getSwitchboard().getConfigBool(SwitchboardConstants.DEBUG_SEARCH_LOCAL_SOLR_OFF, false)) {
-                this.localsolrsearch = RemoteSearch.solrRemoteSearch(this, this.query.solrQuery(this.query.contentdom, false, this.excludeintext_image), this.localsolroffset, nextitems, null /*this peer*/, 0, Switchboard.urlBlacklist);
-            }
-            this.localsolroffset += nextitems;
+			if (!Switchboard.getSwitchboard().getConfigBool(SwitchboardConstants.DEBUG_SEARCH_LOCAL_SOLR_OFF, false)) {
+				this.localsolrsearch = RemoteSearch.solrRemoteSearch(this,
+						this.query.solrQuery(this.query.contentdom, false, this.excludeintext_image),
+						this.localsolroffset, nextitems, null /* this peer */, 0, Switchboard.urlBlacklist);
+			}
+			this.localsolroffset += nextitems;
         }
         
         // now pull results as long as needed and as long as possible
-        if (this.remote && item < 10 && this.resultList.sizeAvailable() <= item) try {Thread.sleep(100);} catch (final InterruptedException e) {ConcurrentLog.logException(e);}
-        while ( this.resultList.sizeAvailable() <= item &&
+		if (this.remote && item < 10 && this.resultList.sizeAvailable() <= item) {
+			try {
+				Thread.sleep(100);
+			} catch (final InterruptedException e) {
+				log.warn("Remote search results wait was interrupted.");
+			}
+		}
+		
+        final int resultListIndex;
+        if (this.remote) {
+        	resultListIndex = item;
+        } else {
+        	resultListIndex = item - (this.localsolroffset - this.query.itemsPerPage);
+        }
+        while ( this.resultList.sizeAvailable() <= resultListIndex &&
                 (this.rwiQueueSize() > 0 || this.nodeStack.sizeQueue() > 0 ||
                 (!this.feedingIsFinished() && System.currentTimeMillis() < finishTime))) {
-            if (!drainStacksToResult()) try {Thread.sleep(10);} catch (final InterruptedException e) {ConcurrentLog.logException(e);}
+			if (!drainStacksToResult()) {
+				try {
+					Thread.sleep(10);
+				} catch (final InterruptedException e) {
+					log.warn("Search results wait was interrupted.");
+				}
+			}
         }
         
         // check if we have a success
-        if (this.resultList.sizeAvailable() > item) {
+        if (this.resultList.sizeAvailable() > resultListIndex) {
             // we have the wanted result already in the result array .. return that
-            final URIMetadataNode re = this.resultList.element(item).getElement();
+            final URIMetadataNode re = this.resultList.element(resultListIndex).getElement();
             EventTracker.update(EventTracker.EClass.SEARCH, new ProfilingGraph.EventSearch(this.query.id(true), SearchEventType.ONERESULT, "fetched, item = " + item + ", available = " + this.getResultCount() + ": " + re.urlstring(), 0, 0), false);
             
             /*
