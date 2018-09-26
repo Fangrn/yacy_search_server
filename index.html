@@ -10,7 +10,7 @@
 <link rel="stylesheet" type="text/css" media="screen"
 	href="stylesheets/stylesheet.css">
 
-<title>Yacy search server experiments</title>
+<title>Yacy search server developments</title>
 </head>
 
 <body>
@@ -22,7 +22,7 @@
 				href="https://github.com/luccioman/yacy_search_server">View on
 				GitHub</a>
 
-			<h1 id="project_title">Yacy search server experiments</h1>
+			<h1 id="project_title">Yacy search server developments</h1>
 			<h2 id="project_tagline">Work in progress on YaCy Search Engine
 				application</h2>
 
@@ -42,80 +42,50 @@
 			<h2>
 				<a id="simplify-yacy-first-launch" class="anchor"
 					href="#simplify-yacy-first-launch" aria-hidden="true"><span
-					aria-hidden="true" class="octicon octicon-link"></span></a>Simplify
-				YaCy first launch
+					aria-hidden="true" class="octicon octicon-link"></span></a>Upgrading
+				YaCy
 			</h2>
 
 			<p>
-				<a
-					href="https://github.com/luccioman/yacy_search_server/tree/deployment">Sources</a>
-				: this branch was forked from yacy <a
-					href="https://github.com/yacy/yacy_search_server">main
-					repository</a>
-			</p>
-
-
-			<p>This is an attempt to simplify YaCy first launch.</p>
-
-			<h3>Try now</h3>
-			<p>
-				<small>(make sure you have at least <a
-					href="https://www.java.com">Java</a> 1.7 installed)
-				</small>
-			</p>
+				Various ways lets you upgrade your YaCy peer to a more recent
+				version than the latest stable release available on <a
+					href="https://yacy.net/">https://yacy.net/</a>.
 			<ul>
-				<li><a href="yacy.jnlp">Launch YaCy</a> with Java Web Start</li>
-				<li>or use <a href="yacycore-1.83-9802.jar">YaCy runnable
-						jar</a> :
-					<ul>
-						<li>double-click the downloaded file</li>
-						<li>or open a terminal and type : <code>java -jar
-								yacycore-1.83-9802.jar</code></li>
-					</ul></li>
-			</ul>
-
-			<h3>Why</h3>
-
-			<p>
-				YaCy main website (<a href="http://yacy.net">http://yacy.net</a>)
-				currently only provide following deployment options :
-			</p>
-
-			<ul>
-				<li>Windows installer</li>
-				<li>Debian package</li>
-				<li>Mac Os application</li>
-				<li>Cross-platform tar.gz archive with .bat and .sh launch
-					scripts</li>
-				<li>Cross-platform sources to compile</li>
-			</ul>
-
-			<p>I think some other packaging options could be useful and may
-				help anyone who whould like to try running a local YaCy peer. These
-				options could be :</p>
-
-			<ul>
-				<li>Self-contained portable application (with embedded jre)</li>
-				<li>Cross-platform :
-
-					<ul>
-						<li>Runnable jar</li>
-						<li>Java Web Start link</li>
-						<li>Browser applet</li>
-						<li>War package</li>
-					</ul>
+				<li>use your peer <em>/ConfigUpdate_p.html</em> administration
+					page
+				</li>, and install a
+				<em>dev</em> prefixed version
+				<li>manually download a tar.gz archive at <a
+					href="http://kaskelix.de/update/">http://kaskelix.de/update/</a> or
+					at <a
+					href="https://github.com/luccioman/yacy_search_server/releases">https://github.com/luccioman/yacy_search_server/releases</a>
+					(these repositories are used by the ConfigUpdate_p.html page)
+				</li>
+				<li>use a Debian repository at <a
+					href="http://debian.yacy.net/">http://debian.yacy.net/</a> (but
+					with a deprecated signing key size) or at <a
+					href="https://bintray.com/luccioman/yacy_search_server/yacy">https://bintray.com/luccioman/yacy_search_server/yacy</a></li>
+				<li>use a Docker image (daily built from latest sources) from
+					Docker Hub at <a href="https://hub.docker.com/r/luccioman/yacy/">https://hub.docker.com/r/luccioman/yacy/</a>
+				</li>
+				<li>clone the main GitHub <a
+					href="https://github.com/yacy/yacy_search_server">repository</a> or
+					download the latest sources <a
+					href="https://github.com/yacy/yacy_search_server/archive/master.zip">zip</a>
+					and build your own binaries (see <a
+					href="https://github.com/yacy/yacy_search_server#how-to-get-the-source-code-and-how-to-compile-yacy-yourself">instructions</a>
+					in the Readme file )
 				</li>
 			</ul>
+			</p>
+
+
 		</section>
 	</div>
 
 	<!-- FOOTER  -->
 	<div id="footer_wrap" class="outer">
 		<footer class="inner">
-			<p class="copyright">
-				Yacy search server experiments maintained by <a
-					href="https://github.com/luccioman">Luc Brière (luccioman)</a>
-			</p>
 			<p>
 				Published with <a href="https://pages.github.com">GitHub Pages</a>
 			</p>
